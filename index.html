@@ -40,8 +40,11 @@
         .budget-title { font-size: 1rem; color: #666; margin-bottom: 10px; font-weight: bold; display: flex; justify-content: space-between; }
         .budget-amount { font-size: 1.5rem; font-weight: bold; color: #2e7d32; margin-bottom: 5px; }
         .progress-bar { width: 100%; background: #e0e0e0; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 10px; }
-        .progress-fill { height: 100%; background: #3f51b5; transition: width 0.3s; }
+        .progress-fill { height: 100%; transition: width 0.3s; }
         .danger { background: #f44336; }
+
+        #nh-bar {background: #4593a0;}
+        #samsung-bar {background: #409ecc;}
         
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; }
@@ -448,35 +451,54 @@
             }
         }
 
-       // 수집된 데이터를 예쁘게 화면에 그려주는 기능
+       // 수집된 데이터를 예쁘게 화면에 그려주고 합계도 계산하는 기능
         function refreshMemoView() {
-            const renderList = (list, hasDate) => {
+            // dateSuffix를 추가해서 '일'인지 '회 남음'인지 구분합니다.
+            const renderList = (list, dateSuffix) => {
                 if(!list || list.length === 0) return '<span style="color:#999; font-size:0.9rem;">내용이 없습니다.</span>';
-                return list.map(item => {
+                
+                let totalSum = 0; // 합계 계산용 변수
+
+                const listHtml = list.map(item => {
                     let amtStr = item.amt ? item.amt.toString().replace(/,/g, '') : '0';
                     let isNeg = amtStr.startsWith('-');
                     let num = parseInt(amtStr.replace(/[^0-9]/g, ''), 10) || 0;
                     let formattedAmt = (isNeg ? '-' : '') + num.toLocaleString('ko-KR');
 
-                    // refreshMemoView 내부 renderList 부분의 리턴값 수정
-                return `
+                    // 총합계 누적 (마이너스면 빼고, 플러스면 더하기)
+                    totalSum += (isNeg ? -num : num);
+
+                    return `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #eee; padding:2px 0; font-size:0.85rem;">
                         <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                            ${item.name || '-'} ${hasDate && item.date ? `<span style="color:#888; font-size:0.75rem; margin-left:4px;">(${item.date}일)</span>` : ''}
+                            ${item.name || '-'} ${dateSuffix && item.date ? `<span style="color:#888; font-size:0.75rem; margin-left:4px;">(${item.date}${dateSuffix})</span>` : ''}
                         </span>
                         <span style="color: ${isNeg ? '#d32f2f' : '#3f51b5'}; font-weight:bold; flex-shrink:0; margin-left:10px;">${formattedAmt}</span>
                     </div>
-                `;
+                    `;
                 }).join('');
+
+                // 리스트 밑에 붙을 총 합계 줄 생성
+                const totalFormatted = totalSum.toLocaleString('ko-KR');
+                const totalHtml = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:6px; border-top:2px solid #ccc; font-size:0.9rem; font-weight:bold;">
+                        <span>총 합계</span>
+                        <span style="color: #1a237e;">${totalFormatted}</span>
+                    </div>
+                `;
+
+                return listHtml + totalHtml;
             };
 
-            document.getElementById('display-memo-income').innerHTML = renderList(appData.memoIncomeList, false);
-            document.getElementById('display-memo-fixed').innerHTML = renderList(appData.memoFixedList, true);
-            document.getElementById('display-memo-installment').innerHTML = renderList(appData.memoInstallmentList, true);
+            // 급여는 꼬리말 없음, 고정비는 '일', 할부금은 '회 남음'으로 각각 다르게 세팅합니다.
+            document.getElementById('display-memo-income').innerHTML = renderList(appData.memoIncomeList, '');
+            document.getElementById('display-memo-fixed').innerHTML = renderList(appData.memoFixedList, '일');
+            document.getElementById('display-memo-installment').innerHTML = renderList(appData.memoInstallmentList, '회 남음');
             
             if(document.getElementById('display-memo-changes')) {
                 document.getElementById('display-memo-changes').innerText = appData.memoChanges || '내용이 없습니다.';
                 document.getElementById('display-memo-changes').style.whiteSpace = 'pre-wrap';
+                document.getElementById('display-memo-changes').style.fontSize = '0.85rem';
             }
         }
 
