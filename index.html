@@ -96,9 +96,9 @@
             <div class="card">
                 <div class="section-title-1">2. 지출 내역</div>
                     <div class="input-row"><label>🏦 적금(선저축)</label><input type="text" id="savings" value="0" oninput="formatAndCalculate()"></div>
-                    <div class="input-row"><label>📄 고정비 (보험/통신)</label><input type="text" id="fixed" value="0" oninput="formatAndCalculate()"></div>
+                    <div class="input-row"><label>📄 고정비 (보험 등)</label><input type="text" id="fixed" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>📺 구독료</label><input type="text" id="subscribe" value="0" oninput="formatAndCalculate()"></div>
-                    <div class="input-row"><label>👨‍👩‍👧‍👦 곗돈/모임비</label><input type="text" id="kye" value="0" oninput="formatAndCalculate()"></div>
+                    <div class="input-row"><label>👨‍👩‍👧‍👦 계/모임비</label><input type="text" id="kye" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>💳 할부금</label><input type="text" id="installment" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>📈 투자금</label><input type="text" id="invest" value="0" oninput="formatAndCalculate()"></div>
                 </div>
@@ -157,15 +157,15 @@
                     <label>카테고리</label>
                     <select id="category">
                         <option value="NH|주유비">🚗 NH카드 - 주유비</option>
-                        <option value="NH|마트/다이소/식재료">🛒 NH카드 - 오프라인 마트</option>
-                        <option value="NH|식재료">🥦 NH카드 - 식재료</option>
+                        <option value="NH|마트/다이소/식재료">🛒 NH카드 - 마트/식재료</option>
+                        <option value="NH|식재료">🥦 NH카드 - 온라인 결제</option>
                         <option value="NH|요기요/배달">🍔 NH카드 - 요기요/배달</option>
                         <option value="삼성|타오바오/직구">📦 삼성카드 - 타오바오/직구</option>
-                        <option value="삼성|기타 잡비">💳 삼성카드 - 기타 잡비</option>
+                        <option value="삼성|기타 잡비">💳 삼성카드 - 기타</option>
                     </select>
                 </div>
                 <div class="input-group"><input type="text" id="amount" placeholder="결제 금액 (예: 15,000)" oninput="formatNumberInputOnly(this)"></div>
-                <div class="input-group"><input type="text" id="memo" placeholder="메모 (예: 바질 파스타 재료)"></div>
+                <div class="input-group"><input type="text" id="memo" placeholder="메모(날짜 및 항목 상세 기재)"></div>
                 <button class="primary-btn" onclick="addTransaction()">기록하고 잔액 확인</button>
             </div>
 
