@@ -219,14 +219,13 @@
                     .from('my_budget_table')
                     .select('content')
                     .eq('id', 1)
-                    .single();
 
                 if (error) throw error;
 
-                if (data && data.content && Object.keys(data.content).length > 0) {
+                if (data.length > 0 && data[0].content) {
                     appData = {
                         ...appData,
-                        ...data.content
+                        ...data[0].content
                     };
                 }
 
@@ -237,6 +236,8 @@
             }
 
             applyDataToUI();
+            formatAndCalculate(false);
+            updateTrackerUI();
 
         };
 
