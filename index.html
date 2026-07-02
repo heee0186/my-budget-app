@@ -224,7 +224,8 @@
                     
                     <div id="memo-view-mode">
                         <div class="memo-display-box"><strong>💵 급여 산출 내역:</strong><br><div id="display-memo-income" style="margin-top:5px;"></div></div>
-                        <div class="memo-display-box"><strong>📄 고정비/구독료 상세:</strong><br><div id="display-memo-fixed" style="margin-top:5px;"></div></div>
+                        <div class="memo-display-box"><strong>📄 고정비 상세:</strong><br><div id="display-memo-fixed" style="margin-top:5px;"></div></div>
+                        <div class="memo-display-box"><strong>📺 구독료 상세:</strong><br><div id="display-memo-subscribe" style="margin-top:5px;"></div></div>
                         <div class="memo-display-box"><strong>💳 기존 할부금 상세:</strong><br><div id="display-memo-installment" style="margin-top:5px;"></div></div>
                         <div class="memo-display-box"><strong>🔄 이번 달 변동 내역:</strong><br><span id="display-memo-changes" style="color: #d32f2f; display:block; margin-top:5px;"></span></div>
                     </div>
@@ -238,8 +239,13 @@
                         </div>
                         
                         <div class="input-group">
-                            <label style="display:flex; justify-content:space-between; align-items:center;">📄 고정비/구독료 상세 <button onclick="addMemoRow('fixed')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
+                            <label style="display:flex; justify-content:space-between; align-items:center;">📄 고정비 상세 <button onclick="addMemoRow('fixed')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
                             <div id="edit-memo-fixed"></div>
+                        </div>
+
+                        <div class="input-group">
+                            <label style="display:flex; justify-content:space-between; align-items:center;">📺 구독료 상세 <button onclick="addMemoRow('subscribe')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
+                            <div id="edit-memo-subscribe"></div>
                         </div>
                         
                         <div class="input-group">
@@ -287,19 +293,39 @@
         }
 
         async function loadMonthData() {
-            // 초기화
             appData = {
                 income: '0', extraIncome: '0', savings: '0', invest: '0', fixed: '0', subscribe: '0', kye: '0', installment: '0',
-                planNh: '0', planSamsung: '0', transactions: [], memoIncome: '', memoFixed: '', memoInstallment: '', memoChanges: ''
+                planNh: '0', planSamsung: '0', transactions: [], 
+                memoIncomeList: [], memoFixedList: [], memoSubscribeList: [], memoInstallmentList: [], memoChanges: '', 
+                isMemoLocked: false 
             };
 
             document.getElementById('month-display').innerText = "데이터 로딩 중...";
 
             try {
                 const { data, error } = await supabaseClient.from('my_budget_table').select('content').eq('id', getViewId());
-                if (error && error.code !== 'PGRST116') throw error; // 데이터 없을 때 나는 에러는 무시
+                if (error && error.code !== 'PGRST116') throw error; 
+                
+                let isNewMonth = true; // 빈 데이터({})가 있을 때를 대비한 꼼수
+
                 if (data && data.length > 0 && data[0].content) {
                     appData = { ...appData, ...data[0].content };
+                    // 데이터가 존재하고, 고정비 내역이 하나라도 있으면 진짜 기록이 있는 달로 인정
+                    if (appData.memoFixedList && appData.memoFixedList.length > 0) isNewMonth = false;
+                } 
+                
+                // 기록이 없는 새로운 달이라면 지난달 데이터를 긁어와서 채웁니다.
+                if (isNewMonth) {
+                    let prevMonth = viewMonth === 1 ? 12 : viewMonth - 1;
+                    let prevYear = viewMonth === 1 ? viewYear - 1 : viewYear;
+                    let prevId = prevYear * 100 + prevMonth;
+                    
+                    const { data: prevData } = await supabaseClient.from('my_budget_table').select('content').eq('id', prevId);
+                    if (prevData && prevData.length > 0 && prevData[0].content) {
+                        appData.memoFixedList = prevData[0].content.memoFixedList || [];
+                        appData.memoSubscribeList = prevData[0].content.memoSubscribeList || [];
+                        appData.memoInstallmentList = prevData[0].content.memoInstallmentList || [];
+                    }
                 }
             } catch (err) {
                 console.error("불러오기 실패", err);
@@ -402,18 +428,24 @@
             const btn = document.getElementById('btn-memo-edit');
 
             if(isMemoEditMode) {
-                // 보기 -> 수정 모드로 갈 때 (기존 데이터를 입력창으로 변환)
                 document.getElementById('edit-memo-income').innerHTML = '';
                 document.getElementById('edit-memo-fixed').innerHTML = '';
+                document.getElementById('edit-memo-subscribe').innerHTML = '';
                 document.getElementById('edit-memo-installment').innerHTML = '';
                 
+                if(!Array.isArray(appData.memoIncomeList)) appData.memoIncomeList = [];
+                if(!Array.isArray(appData.memoFixedList)) appData.memoFixedList = [];
+                if(!Array.isArray(appData.memoSubscribeList)) appData.memoSubscribeList = [];
+                if(!Array.isArray(appData.memoInstallmentList)) appData.memoInstallmentList = [];
+
                 appData.memoIncomeList.forEach(item => addMemoRow('income', item));
                 appData.memoFixedList.forEach(item => addMemoRow('fixed', item));
+                appData.memoSubscribeList.forEach(item => addMemoRow('subscribe', item));
                 appData.memoInstallmentList.forEach(item => addMemoRow('installment', item));
 
-                // 만약 데이터가 하나도 없으면 기본으로 1칸씩 띄워주기
                 if(appData.memoIncomeList.length === 0) addMemoRow('income');
                 if(appData.memoFixedList.length === 0) addMemoRow('fixed');
+                if(appData.memoSubscribeList.length === 0) addMemoRow('subscribe');
                 if(appData.memoInstallmentList.length === 0) addMemoRow('installment');
 
                 document.getElementById('memo-view-mode').style.display = 'none';
@@ -421,23 +453,16 @@
                 btn.innerText = '등록 완료';
                 btn.style.background = '#4CAF50';
             } else {
-                // 수정 -> 보기 모드로 갈 때 (입력창의 데이터를 수집해서 서버에 저장)
-                appData.memoIncomeList = Array.from(document.querySelectorAll('.row-income')).map(row => ({
-                    name: row.querySelector('.i-name').value,
-                    amt: row.querySelector('.i-amt').value
-                })).filter(item => item.name || item.amt);
-
-                appData.memoFixedList = Array.from(document.querySelectorAll('.row-fixed')).map(row => ({
+                const getRows = (selector) => Array.from(document.querySelectorAll(selector)).map(row => ({
                     name: row.querySelector('.i-name').value,
                     amt: row.querySelector('.i-amt').value,
-                    date: row.querySelector('.i-date').value
+                    date: row.querySelector('.i-date') ? row.querySelector('.i-date').value : ''
                 })).filter(item => item.name || item.amt || item.date);
 
-                appData.memoInstallmentList = Array.from(document.querySelectorAll('.row-installment')).map(row => ({
-                    name: row.querySelector('.i-name').value,
-                    amt: row.querySelector('.i-amt').value,
-                    date: row.querySelector('.i-date').value
-                })).filter(item => item.name || item.amt || item.date);
+                appData.memoIncomeList = getRows('.row-income');
+                appData.memoFixedList = getRows('.row-fixed');
+                appData.memoSubscribeList = getRows('.row-subscribe');
+                appData.memoInstallmentList = getRows('.row-installment');
 
                 appData.memoChanges = document.getElementById('memo-changes').value;
                 
@@ -451,21 +476,17 @@
             }
         }
 
-       // 수집된 데이터를 예쁘게 화면에 그려주고 합계도 계산하는 기능
         function refreshMemoView() {
-            // dateSuffix를 추가해서 '일'인지 '회 남음'인지 구분합니다.
             const renderList = (list, dateSuffix) => {
                 if(!list || list.length === 0) return '<span style="color:#999; font-size:0.9rem;">내용이 없습니다.</span>';
                 
-                let totalSum = 0; // 합계 계산용 변수
-
+                let totalSum = 0; 
                 const listHtml = list.map(item => {
                     let amtStr = item.amt ? item.amt.toString().replace(/,/g, '') : '0';
                     let isNeg = amtStr.startsWith('-');
                     let num = parseInt(amtStr.replace(/[^0-9]/g, ''), 10) || 0;
                     let formattedAmt = (isNeg ? '-' : '') + num.toLocaleString('ko-KR');
 
-                    // 총합계 누적 (마이너스면 빼고, 플러스면 더하기)
                     totalSum += (isNeg ? -num : num);
 
                     return `
@@ -478,7 +499,6 @@
                     `;
                 }).join('');
 
-                // 리스트 밑에 붙을 총 합계 줄 생성
                 const totalFormatted = totalSum.toLocaleString('ko-KR');
                 const totalHtml = `
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; padding-top:6px; border-top:2px solid #ccc; font-size:0.9rem; font-weight:bold;">
@@ -490,9 +510,9 @@
                 return listHtml + totalHtml;
             };
 
-            // 급여는 꼬리말 없음, 고정비는 '일', 할부금은 '회 남음'으로 각각 다르게 세팅합니다.
             document.getElementById('display-memo-income').innerHTML = renderList(appData.memoIncomeList, '');
             document.getElementById('display-memo-fixed').innerHTML = renderList(appData.memoFixedList, '일');
+            document.getElementById('display-memo-subscribe').innerHTML = renderList(appData.memoSubscribeList, '일');
             document.getElementById('display-memo-installment').innerHTML = renderList(appData.memoInstallmentList, '회 남음');
             
             if(document.getElementById('display-memo-changes')) {
@@ -501,6 +521,7 @@
                 document.getElementById('display-memo-changes').style.fontSize = '0.85rem';
             }
         }
+        
 
         // '추가' 버튼을 눌렀을 때 입력칸(행)을 만들어주는 기능
         function addMemoRow(type, data = {}) {
@@ -509,20 +530,20 @@
             div.className = `row-${type}`;
             div.style.display = 'flex';
             div.style.gap = '4px';
-            div.style.marginBottom = '2px'; // 줄간격 최소화
+            div.style.marginBottom = '2px'; 
 
-            // 급여는 날짜 제외, 나머지는 날짜 포함
             let dateInput = '';
             if(type !== 'income') {
-                dateInput = `<input type="text" class="i-date" placeholder="일" value="${data.date || ''}" style="width:15%; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">`;
+                // 타입이 installment 이면 남은회차, 그 외는 일
+                let placeholderText = (type === 'installment') ? '남은회차' : '일';
+                dateInput = `<input type="text" class="i-date" placeholder="${placeholderText}" value="${data.date || ''}" style="width:15%; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">`;
             }
 
-            // i-amt 칸에 oninput 추가, 정렬을 우측(text-align:right)으로 변경
-           div.innerHTML = `
-            <input type="text" class="i-name" placeholder="항목" value="${data.name || ''}" style="width:${type === 'income' ? '60%' : '45%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">
-            <input type="text" class="i-amt" placeholder="금액" value="${data.amt || ''}" oninput="formatNumberInputOnly(this)" style="width:${type === 'income' ? '30%' : '30%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem; text-align:right;">
-            ${dateInput}
-            <button onclick="this.parentElement.remove()" style="width:10%; background:#f44336; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; padding:2px;">X</button>
+            div.innerHTML = `
+                <input type="text" class="i-name" placeholder="항목" value="${data.name || ''}" style="width:${type === 'income' ? '60%' : '45%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">
+                <input type="text" class="i-amt" placeholder="금액" value="${data.amt || ''}" oninput="formatNumberInputOnly(this)" style="width:${type === 'income' ? '30%' : '30%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem; text-align:right;">
+                ${dateInput}
+                <button onclick="this.parentElement.remove()" style="width:10%; background:#f44336; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; padding:2px;">X</button>
             `;
             container.appendChild(div);
         }
