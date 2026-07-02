@@ -409,16 +409,25 @@
             }
         }
 
-        // 수집된 데이터를 예쁘게 화면에 그려주는 기능
+       // 수집된 데이터를 예쁘게 화면에 그려주는 기능
         function refreshMemoView() {
             const renderList = (list, hasDate) => {
                 if(!list || list.length === 0) return '<span style="color:#999; font-size:0.9rem;">내용이 없습니다.</span>';
-                return list.map(item => `
-                    <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #ccc; padding:6px 0; font-size:0.95rem;">
+                return list.map(item => {
+                    // 화면에 띄울 때 무조건 콤마 찍기
+                    let amtStr = item.amt ? item.amt.toString().replace(/,/g, '') : '0';
+                    let isNeg = amtStr.startsWith('-');
+                    let num = parseInt(amtStr.replace(/[^0-9]/g, ''), 10) || 0;
+                    let formattedAmt = (isNeg ? '-' : '') + num.toLocaleString('ko-KR');
+
+                    // padding과 margin을 확 줄여서 슬림하게 만듦
+                    return `
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #ccc; padding:2px 0; margin-bottom:2px; font-size:0.95rem;">
                         <span>${item.name || '-'} ${hasDate && item.date ? `<span style="color:#888; font-size:0.85rem; margin-left:4px;">(${item.date}일)</span>` : ''}</span>
-                        <span><strong style="color:#3f51b5;">${item.amt || '0'}</strong></span>
+                        <span><strong style="color:#3f51b5;">${formattedAmt}</strong></span>
                     </div>
-                `).join('');
+                    `;
+                }).join('');
             };
 
             document.getElementById('display-memo-income').innerHTML = renderList(appData.memoIncomeList, false);
@@ -427,7 +436,7 @@
             
             if(document.getElementById('display-memo-changes')) {
                 document.getElementById('display-memo-changes').innerText = appData.memoChanges || '내용이 없습니다.';
-                document.getElementById('display-memo-changes').style.whiteSpace = 'pre-wrap'; // 줄바꿈 유지
+                document.getElementById('display-memo-changes').style.whiteSpace = 'pre-wrap';
             }
         }
 
@@ -438,19 +447,20 @@
             div.className = `row-${type}`;
             div.style.display = 'flex';
             div.style.gap = '5px';
-            div.style.marginBottom = '8px';
+            div.style.marginBottom = '4px'; // 수정 모드에서의 간격도 줄임
 
             // 급여는 날짜 제외, 나머지는 날짜 포함
             let dateInput = '';
             if(type !== 'income') {
-                dateInput = `<input type="text" class="i-date" placeholder="날짜(일)" value="${data.date || ''}" style="width:25%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">`;
+                dateInput = `<input type="text" class="i-date" placeholder="일" value="${data.date || ''}" style="width:20%; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">`;
             }
 
+            // i-amt 칸에 oninput 추가, 정렬을 우측(text-align:right)으로 변경
             div.innerHTML = `
-                <input type="text" class="i-name" placeholder="항목명" value="${data.name || ''}" style="width:${type === 'income' ? '50%' : '40%'}; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
-                <input type="text" class="i-amt" placeholder="금액" value="${data.amt || ''}" style="width:${type === 'income' ? '40%' : '25%'}; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
+                <input type="text" class="i-name" placeholder="항목명" value="${data.name || ''}" style="width:${type === 'income' ? '50%' : '45%'}; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
+                <input type="text" class="i-amt" placeholder="금액" value="${data.amt || ''}" oninput="formatNumberInputOnly(this)" style="width:${type === 'income' ? '50%' : '35%'}; padding:6px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem; text-align:right;">
                 ${dateInput}
-                <button onclick="this.parentElement.remove()" style="width:10%; background:#f44336; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">X</button>
+                <button onclick="this.parentElement.remove()" style="width:10%; background:#f44336; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; padding:6px;">X</button>
             `;
             container.appendChild(div);
         }
@@ -503,8 +513,16 @@
 
         function getNum(id) { return parseInt(document.getElementById(id).value.replace(/,/g, ''), 10) || 0; }
         function formatNumberInputOnly(input) {
-            let value = input.value.replace(/,/g, '').replace(/[^0-9]/g, '');
-            if (value !== '') input.value = parseInt(value, 10).toLocaleString('ko-KR');
+            let value = input.value.replace(/,/g, '');
+            // 마이너스(-) 기호 유지 기능 추가
+            let isNegative = value.startsWith('-');
+            value = value.replace(/[^0-9]/g, '');
+            
+            if (value !== '') {
+                input.value = (isNegative ? '-' : '') + parseInt(value, 10).toLocaleString('ko-KR');
+            } else {
+                input.value = isNegative ? '-' : '';
+            }
         }
 
         function switchTab(tabName) {
