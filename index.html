@@ -178,40 +178,54 @@
 
         <!-- ================= TAB 3: 상세 내역 관리 ================= -->
        <div id="tab-memo" class="tab-content">
-            <div class="card">
-                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>명세서 보관함</span>
-                    <button id="btn-memo-edit" onclick="toggleMemoEdit()" style="background:#3f51b5; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.9rem;">수정하기</button>
-                </div>
-                
-                <div id="memo-view-mode">
-                    <div class="memo-display-box"><strong>💵 급여 산출 내역:</strong><br><div id="display-memo-income" style="margin-top:5px;"></div></div>
-                    <div class="memo-display-box"><strong>📄 고정비/구독료 상세:</strong><br><div id="display-memo-fixed" style="margin-top:5px;"></div></div>
-                    <div class="memo-display-box"><strong>💳 기존 할부금 상세:</strong><br><div id="display-memo-installment" style="margin-top:5px;"></div></div>
-                    <div class="memo-display-box"><strong>🔄 이번 달 변동 내역:</strong><br><span id="display-memo-changes" style="color: #d32f2f; display:block; margin-top:5px;"></span></div>
-                </div>
+            
+            <div id="memo-lock-screen" class="card" style="text-align: center; padding: 40px 20px;">
+                <div style="font-size: 3rem; margin-bottom: 10px;">🔒</div>
+                <h3 style="color: #1a237e; margin-bottom: 20px;">비밀번호 입력</h3>
+                <input type="password" id="memo-pwd-input" placeholder="비밀번호 4자리" style="width: 50%; padding: 12px; margin-bottom: 15px; text-align: center; font-size: 1.2rem; letter-spacing: 5px;">
+                <br>
+                <button onclick="unlockMemo()" class="primary-btn" style="width: 50%;">확인</button>
+            </div>
 
-                <div id="memo-edit-mode" style="display:none;">
-                    <p style="font-size: 0.85rem; color: #666; margin-top: 0; margin-bottom: 15px;">[+ 추가] 버튼을 눌러 칸을 늘리고, 작성이 끝나면 [등록 완료]를 누르세요.</p>
-                    
-                    <div class="input-group">
-                        <label style="display:flex; justify-content:space-between; align-items:center;">💵 급여 산출 내역 <button onclick="addMemoRow('income')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
-                        <div id="edit-memo-income"></div>
+            <div id="memo-secret-content" style="display: none;">
+                <div class="card">
+                    <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>명세서 보관함</span>
+                        <div>
+                            <button onclick="lockMemo()" style="background:#555; color:white; border:none; border-radius:4px; padding:6px 10px; font-size:0.8rem; cursor:pointer; margin-right:5px;">🔒 다시 잠금</button>
+                            <button id="btn-memo-edit" onclick="toggleMemoEdit()" style="background:#3f51b5; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.9rem;">수정하기</button>
+                        </div>
                     </div>
                     
-                    <div class="input-group">
-                        <label style="display:flex; justify-content:space-between; align-items:center;">📄 고정비/구독료 상세 <button onclick="addMemoRow('fixed')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
-                        <div id="edit-memo-fixed"></div>
+                    <div id="memo-view-mode">
+                        <div class="memo-display-box"><strong>💵 급여 산출 내역:</strong><br><div id="display-memo-income" style="margin-top:5px;"></div></div>
+                        <div class="memo-display-box"><strong>📄 고정비/구독료 상세:</strong><br><div id="display-memo-fixed" style="margin-top:5px;"></div></div>
+                        <div class="memo-display-box"><strong>💳 기존 할부금 상세:</strong><br><div id="display-memo-installment" style="margin-top:5px;"></div></div>
+                        <div class="memo-display-box"><strong>🔄 이번 달 변동 내역:</strong><br><span id="display-memo-changes" style="color: #d32f2f; display:block; margin-top:5px;"></span></div>
                     </div>
-                    
-                    <div class="input-group">
-                        <label style="display:flex; justify-content:space-between; align-items:center;">💳 기존 할부금 상세 <button onclick="addMemoRow('installment')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
-                        <div id="edit-memo-installment"></div>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label>🔄 이번 달 변동 내역</label>
-                        <textarea id="memo-changes" placeholder="구독 취소, 추가 지출 등 이번 달 변동 사항을 자유롭게 적어두세요."></textarea>
+
+                    <div id="memo-edit-mode" style="display:none;">
+                        <p style="font-size: 0.85rem; color: #666; margin-top: 0; margin-bottom: 15px;">[+ 추가] 버튼을 눌러 칸을 늘리고, 작성이 끝나면 [등록 완료]를 누르세요.</p>
+                        
+                        <div class="input-group">
+                            <label style="display:flex; justify-content:space-between; align-items:center;">💵 급여 산출 내역 <button onclick="addMemoRow('income')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
+                            <div id="edit-memo-income"></div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label style="display:flex; justify-content:space-between; align-items:center;">📄 고정비/구독료 상세 <button onclick="addMemoRow('fixed')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
+                            <div id="edit-memo-fixed"></div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label style="display:flex; justify-content:space-between; align-items:center;">💳 기존 할부금 상세 <button onclick="addMemoRow('installment')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
+                            <div id="edit-memo-installment"></div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label>🔄 이번 달 변동 내역 (자유 입력)</label>
+                            <textarea id="memo-changes" placeholder="구독 취소, 추가 지출 등 이번 달 변동 사항을 자유롭게 적어두세요."></textarea>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -614,6 +628,32 @@
                 appData.transactions = [];
                 syncToServer();
                 updateTrackerUI();
+            }
+        }
+
+        // ★ 설정하실 비밀번호를 이곳에 입력하세요 (기본값: 1234)
+        const MEMO_PASSWORD = "1106";
+
+        // 비밀번호 확인 및 잠금 해제
+        function unlockMemo() {
+            const inputVal = document.getElementById('memo-pwd-input').value;
+            if (inputVal === MEMO_PASSWORD) {
+                document.getElementById('memo-lock-screen').style.display = 'none';
+                document.getElementById('memo-secret-content').style.display = 'block';
+                document.getElementById('memo-pwd-input').value = ''; // 입력창 비우기
+            } else {
+                alert('비밀번호가 일치하지 않습니다.');
+            }
+        }
+
+        // 명세서 다시 가리기
+        function lockMemo() {
+            document.getElementById('memo-lock-screen').style.display = 'block';
+            document.getElementById('memo-secret-content').style.display = 'none';
+            
+            // 만약 수정 모드로 켜져있었다면, 보기 모드로 자동 전환(저장) 처리
+            if (isMemoEditMode) {
+                toggleMemoEdit();
             }
         }
     </script>
