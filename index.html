@@ -59,7 +59,12 @@
     </style>
 </head>
 <body>
-    <div class="header">💰 가계부</div>
+    <div class="header" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3f51b5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+        </svg>
+        💰가계부
+    </div>
     <div style="text-align: center; padding: 15px; background: white; font-weight: bold; font-size: 1.2rem; border-bottom: 1px solid #eee; position: relative;">
         <button onclick="changeMonth(-1)" style="border:none; background:none; cursor:pointer; font-size:1.2rem; padding:0 20px;">◀</button>
         <span id="month-display">2026년 7월</span>
@@ -99,8 +104,15 @@
                     <div class="input-row"><label>📄 고정비 (보험 등)</label><input type="text" id="fixed" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>📺 구독료</label><input type="text" id="subscribe" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>👨‍👩‍👧‍👦 계/모임비</label><input type="text" id="kye" value="0" oninput="formatAndCalculate()"></div>
-                    <div class="input-row"><label>💳 할부금</label><input type="text" id="installment" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>📈 투자금</label><input type="text" id="invest" value="0" oninput="formatAndCalculate()"></div>
+                    <div class="input-group">
+                        <label>💳 기존 할부금</label>
+                        <input type="text" id="installment" oninput="formatAndCalculate()" placeholder="0">
+                        <label style="display:flex; align-items:center; gap:5px; font-size:0.85rem; color:#555; margin-top:5px; cursor:pointer;">
+                            <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()">
+                            이 할부금을 삼성카드 예산 한도에서 미리 빼기
+                        </label>
+                    </div>                
                 </div>
 
             <!-- 계산 결과 대시보드 -->
@@ -287,6 +299,7 @@
         window.onload = function () {
             document.getElementById('tx-date').valueAsDate = new Date();
             loadMonthData();
+            switchTab('track');
         };
 
         function checkReadOnly() {
@@ -343,6 +356,8 @@
             document.getElementById('subscribe').value = appData.subscribe || '0';
             document.getElementById('kye').value = appData.kye || '0';
             document.getElementById('installment').value = appData.installment || '0';
+            // 체크박스 상태 불러오기
+            if(document.getElementById('chk-deduct-installment')) document.getElementById('chk-deduct-installment').checked = appData.deductInstallment || false;
             document.getElementById('plan-nh').value = appData.planNh || '0';
             document.getElementById('plan-samsung').value = appData.planSamsung || '0';
             
@@ -482,6 +497,8 @@
 
         let syncTimer; 
         function formatAndCalculate(shouldSync = true) {
+            // 체크박스 상태 저장하기
+            if(document.getElementById('chk-deduct-installment')) appData.deductInstallment = document.getElementById('chk-deduct-installment').checked;
             const ids = ['income', 'extra-income', 'savings', 'invest', 'fixed', 'subscribe', 'kye', 'installment', 'plan-nh', 'plan-samsung'];
             ids.forEach(id => {
                 let el = document.getElementById(id);
@@ -552,8 +569,15 @@
 
         function updateTrackerUI() {
             const targetNh = parseInt(appData.planNh.replace(/,/g, ''), 10) || 0;
-            const targetSamsung = parseInt(appData.planSamsung.replace(/,/g, ''), 10) || 0;
+            let targetSamsung = parseInt(appData.planSamsung.replace(/,/g, ''), 10) || 0; // let으로 변경
 
+            // ★ 할부금 차감 체크박스가 켜져있다면, 삼성카드 목표액에서 빼기
+            if (appData.deductInstallment) {
+            const inst = parseInt((appData.installment || '0').replace(/,/g, ''), 10) || 0;
+            targetSamsung -= inst;
+            
+            }
+    
             document.getElementById('display-nh-plan').innerText = `목표: ${targetNh.toLocaleString()}원`;
             document.getElementById('display-samsung-plan').innerText = `목표: ${targetSamsung.toLocaleString()}원`;
 
