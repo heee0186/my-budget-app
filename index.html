@@ -55,10 +55,17 @@
         .delete-btn { color: #f44336; font-size: 0.9rem; font-weight: bold; cursor: pointer; background: #ffebee; border: none; border-radius: 4px; padding: 5px 10px; margin-left: 10px; }
         
         #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; font-weight: bold; color: #1a237e; }
+        .memo-display-box { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; margin-bottom: 10px; font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; }
     </style>
 </head>
 <body>
     <div class="header">💰 가계부</div>
+    <div style="text-align: center; padding: 15px; background: white; font-weight: bold; font-size: 1.2rem; border-bottom: 1px solid #eee; position: relative;">
+        <button onclick="changeMonth(-1)" style="border:none; background:none; cursor:pointer; font-size:1.2rem; padding:0 20px;">◀</button>
+        <span id="month-display">2026년 7월</span>
+        <button onclick="changeMonth(1)" style="border:none; background:none; cursor:pointer; font-size:1.2rem; padding:0 20px;">▶</button>
+        <button id="btn-force-edit" onclick="enableForceEdit()" style="display:none; position: absolute; right: 15px; top: 15px; font-size: 0.8rem; background: #f44336; color: white; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer;">잠금 풀기</button>
+    </div>
     
     <!-- 상단 탭 -->
     <div class="tab-nav">
@@ -89,12 +96,12 @@
             <div class="card">
                 <div class="section-title-1">2. 지출 내역</div>
                     <div class="input-row"><label>🏦 적금(선저축)</label><input type="text" id="savings" value="0" oninput="formatAndCalculate()"></div>
-                    <div class="input-row"><label>📈 투자금</label><input type="text" id="invest" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>📄 고정비 (보험/통신)</label><input type="text" id="fixed" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>📺 구독료</label><input type="text" id="subscribe" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>👨‍👩‍👧‍👦 곗돈/모임비</label><input type="text" id="kye" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-row"><label>💳 할부금</label><input type="text" id="installment" value="0" oninput="formatAndCalculate()"></div>
-            </div>
+                    <div class="input-row"><label>📈 투자금</label><input type="text" id="invest" value="0" oninput="formatAndCalculate()"></div>
+                </div>
 
             <!-- 계산 결과 대시보드 -->
             <div class="card" style="border: 2px solid #00796b;">
@@ -172,80 +179,146 @@
         <!-- ================= TAB 3: 상세 내역 관리 ================= -->
         <div id="tab-memo" class="tab-content">
             <div class="card">
-                <div class="section-title">명세서 보관함 (메모장)</div>
-                <p style="font-size: 0.85rem; color: #666; margin-top: 0;">항목을 입력하고 바깥 화면을 터치하면 구글 서버에 자동 저장됩니다.</p>
+                <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>명세서 보관함 (메모장)</span>
+                    <button id="btn-memo-edit" onclick="toggleMemoEdit()" style="background:#3f51b5; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.9rem;">수정하기</button>
+                </div>
                 
-                <div class="input-group">
-                    <label>💵 급여 산출 내역 (예: 기본급, 수당 등)</label>
-                    <textarea id="memo-income" placeholder="급여 상세 내역을 적어두세요." onblur="saveMemos()"></textarea>
+                <div id="memo-view-mode">
+                    <div class="memo-display-box"><strong>💵 급여 산출 내역:</strong><br><span id="display-memo-income">내용이 없습니다.</span></div>
+                    <div class="memo-display-box"><strong>📄 고정비/구독료 상세:</strong><br><span id="display-memo-fixed">내용이 없습니다.</span></div>
+                    <div class="memo-display-box"><strong>💳 기존 할부금 상세:</strong><br><span id="display-memo-installment">내용이 없습니다.</span></div>
+                    <div class="memo-display-box"><strong>🔄 이번 달 변동 내역:</strong><br><span id="display-memo-changes" style="color: #d32f2f;">내용이 없습니다.</span></div>
                 </div>
-                <div class="input-group">
-                    <label>📄 고정비/구독료 상세 (보험료, 넷플릭스 등)</label>
-                    <textarea id="memo-fixed" placeholder="매달 나가는 고정비와 구독료 항목을 적어두세요." onblur="saveMemos()"></textarea>
+
+                <div id="memo-edit-mode" style="display:none;">
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 0; margin-bottom: 15px;">작성을 마친 후 우측 상단의 [등록 완료]를 누르세요.</p>
+                    <div class="input-group">
+                        <label>💵 급여 산출 내역</label>
+                        <textarea id="memo-income" placeholder="급여 상세 내역을 적어두세요."></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>📄 고정비/구독료 상세</label>
+                        <textarea id="memo-fixed" placeholder="매달 나가는 고정비와 구독료 항목을 적어두세요."></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>💳 기존 할부금 상세</label>
+                        <textarea id="memo-installment" placeholder="현재 남은 할부 항목과 금액을 적어두세요."></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>🔄 이번 달 변동 내역</label>
+                        <textarea id="memo-changes" placeholder="구독 취소, 추가 지출 등 이번 달 변동 사항을 적어두세요."></textarea>
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>💳 기존 할부금 상세 (자동차, 핸드폰 등)</label>
-                    <textarea id="memo-installment" placeholder="현재 남은 할부 항목과 금액을 적어두세요." onblur="saveMemos()"></textarea>
-                </div>
-                <button class="primary-btn" onclick="saveMemos(); alert('저장되었습니다.');" style="margin-top: 10px;">수동으로 저장하기</button>
             </div>
         </div>
     </div>
 
     <script>
         const SUPABASE_URL = "https://pbzwcsaveufsqbmhygon.supabase.co";
-
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiendjc2F2ZXVmc3FibWh5Z29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTQ2MTgsImV4cCI6MjA5MDc3MDYxOH0.sq8gWEF7ntiA3pL9DeDQ59rVNuDzXBkJSDJmC2OHIOE";
-
-        const supabaseClient = supabase.createClient(
-            SUPABASE_URL,
-            SUPABASE_KEY
-        );
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let appData = {
-            income: '2,100,000', savings: '500,000', invest: '0', fixed: '480,000', subscribe: '0', kye: '160,000', installment: '280,000',
+            income: '2,100,000', extraIncome: '0', savings: '0', invest: '0', fixed: '480,000', subscribe: '0', kye: '160,000', installment: '280,000',
             planNh: '200,000', planSamsung: '220,000',
             transactions: [],
-            memoIncome: '', memoFixed: '', memoInstallment: ''
+            memoIncome: '', memoFixed: '', memoInstallment: '', memoChanges: '' // 변동내역 추가
         };
 
-        window.onload = async function () {
+        let today = new Date();
+        let viewYear = today.getFullYear();
+        let viewMonth = today.getMonth() + 1;
+        let forceEditMode = false;
+        let isMemoEditMode = false;
 
-            document.getElementById('tx-date').valueAsDate = new Date();
+        function getViewId() { return viewYear * 100 + viewMonth; }
+
+        function changeMonth(delta) {
+            viewMonth += delta;
+            if (viewMonth < 1) { viewMonth = 12; viewYear--; }
+            if (viewMonth > 12) { viewMonth = 1; viewYear++; }
+            forceEditMode = false; // 달 넘기면 잠금 풀기 리셋
+            isMemoEditMode = false; // 메모장 편집모드 리셋
+            loadMonthData();
+        }
+
+        async function loadMonthData() {
+            // 초기화
+            appData = {
+                income: '0', extraIncome: '0', savings: '0', invest: '0', fixed: '0', subscribe: '0', kye: '0', installment: '0',
+                planNh: '0', planSamsung: '0', transactions: [], memoIncome: '', memoFixed: '', memoInstallment: '', memoChanges: ''
+            };
+
+            document.getElementById('month-display').innerText = "데이터 로딩 중...";
 
             try {
-
-                const { data, error } = await supabaseClient
-                    .from('my_budget_table')
-                    .select('content')
-                    .eq('id', 1)
-
-                if (error) throw error;
-
-                if (data.length > 0 && data[0].content) {
-                    appData = {
-                        ...appData,
-                        ...data[0].content
-                    };
+                const { data, error } = await supabaseClient.from('my_budget_table').select('content').eq('id', getViewId());
+                if (error && error.code !== 'PGRST116') throw error; // 데이터 없을 때 나는 에러는 무시
+                if (data && data.length > 0 && data[0].content) {
+                    appData = { ...appData, ...data[0].content };
                 }
-
             } catch (err) {
-
                 console.error("불러오기 실패", err);
-
             }
 
             applyDataToUI();
-            formatAndCalculate(false);
-            updateTrackerUI();
+            checkReadOnly();
+        }
 
+        window.onload = function () {
+            document.getElementById('tx-date').valueAsDate = new Date();
+            loadMonthData();
         };
 
+        function checkReadOnly() {
+            const realYear = today.getFullYear();
+            const realMonth = today.getMonth() + 1;
+            const isPast = (viewYear < realYear) || (viewYear === realYear && viewMonth < realMonth);
+
+            const displayEl = document.getElementById('month-display');
+            const forceEditBtn = document.getElementById('btn-force-edit');
+
+            if (isPast && !forceEditMode) {
+                displayEl.innerText = `${viewYear}년 ${viewMonth}월 (잠김)`;
+                displayEl.style.color = '#f44336';
+                forceEditBtn.style.display = 'inline-block'; // 잠금 풀기 버튼 표시
+            } else {
+                displayEl.innerText = `${viewYear}년 ${viewMonth}월`;
+                displayEl.style.color = '#333';
+                forceEditBtn.style.display = 'none';
+            }
+
+            const shouldLock = isPast && !forceEditMode;
+            const inputs = document.querySelectorAll('input, textarea, select, button.primary-btn, button.reset-btn');
+            inputs.forEach(el => {
+                if(el.id !== 'btn-memo-edit') { el.disabled = shouldLock; }
+            });
+            document.getElementById('btn-memo-edit').style.display = shouldLock ? 'none' : 'block';
+        }
+
+        function enableForceEdit() {
+            if(confirm('과거 기록의 잠금을 해제하시겠습니까?\n수정 시 데이터가 덮어씌워집니다.')) {
+                forceEditMode = true;
+                checkReadOnly();
+            }
+        }
+
+        async function syncToServer() {
+            const realYear = today.getFullYear();
+            const realMonth = today.getMonth() + 1;
+            const isPast = (viewYear < realYear) || (viewYear === realYear && viewMonth < realMonth);
+            
+            // 과거인데 강제수정 모드도 아니라면 저장(서버통신) 차단
+            if (isPast && !forceEditMode) return;
+
+            // upsert: 데이터가 없으면 새로 만들고, 있으면 덮어씌움 (월별 관리 핵심 기술)
+            await supabaseClient.from('my_budget_table').upsert({ id: getViewId(), content: appData });
+        }
 
         function applyDataToUI() {
             document.getElementById('income').value = appData.income || '0';
-            // 부수입 불러오기 추가
-            if(document.getElementById('extra-income')) document.getElementById('extra-income').value = appData.extraIncome || '0'; 
+            if(document.getElementById('extra-income')) document.getElementById('extra-income').value = appData.extraIncome || '0';
             document.getElementById('savings').value = appData.savings || '0';
             document.getElementById('invest').value = appData.invest || '0';
             document.getElementById('fixed').value = appData.fixed || '0';
@@ -258,47 +331,55 @@
             document.getElementById('memo-income').value = appData.memoIncome || '';
             document.getElementById('memo-fixed').value = appData.memoFixed || '';
             document.getElementById('memo-installment').value = appData.memoInstallment || '';
+            if(document.getElementById('memo-changes')) document.getElementById('memo-changes').value = appData.memoChanges || '';
 
+            refreshMemoView();
             formatAndCalculate(false);
             updateTrackerUI();
+
+            // 탭3 화면 정리 (수정모드로 켜져있으면 보기모드로 원복)
+            document.getElementById('memo-view-mode').style.display = 'block';
+            document.getElementById('memo-edit-mode').style.display = 'none';
+            document.getElementById('btn-memo-edit').innerText = '수정하기';
+            document.getElementById('btn-memo-edit').style.background = '#3f51b5';
         }
 
-        async function syncToServer() {
-
-            const { data, error } = await supabaseClient
-                .from('my_budget_table')
-                .update({
-                    content: appData
-                })
-                .eq('id', 1)
-                .select();
-
-            console.log("DATA :", data);
-            console.log("ERROR :", error);
-
+        // 3번 탭 보기/수정 모드 전환 함수
+        function toggleMemoEdit() {
+            isMemoEditMode = !isMemoEditMode;
+            if(isMemoEditMode) {
+                // 보기 -> 수정
+                document.getElementById('memo-view-mode').style.display = 'none';
+                document.getElementById('memo-edit-mode').style.display = 'block';
+                document.getElementById('btn-memo-edit').innerText = '등록 완료';
+                document.getElementById('btn-memo-edit').style.background = '#4CAF50';
+            } else {
+                // 수정 -> 보기 (저장 처리)
+                appData.memoIncome = document.getElementById('memo-income').value;
+                appData.memoFixed = document.getElementById('memo-fixed').value;
+                appData.memoInstallment = document.getElementById('memo-installment').value;
+                appData.memoChanges = document.getElementById('memo-changes').value;
+                
+                syncToServer();
+                refreshMemoView();
+                
+                document.getElementById('memo-view-mode').style.display = 'block';
+                document.getElementById('memo-edit-mode').style.display = 'none';
+                document.getElementById('btn-memo-edit').innerText = '수정하기';
+                document.getElementById('btn-memo-edit').style.background = '#3f51b5';
+            }
         }
 
-        function switchTab(tabName) {
-            ['plan', 'track', 'memo'].forEach(name => {
-                document.getElementById('btn-' + name).classList.remove('active');
-                document.getElementById('tab-' + name).classList.remove('active');
-            });
-            document.getElementById('btn-' + tabName).classList.add('active');
-            document.getElementById('tab-' + tabName).classList.add('active');
-            if(tabName === 'track') updateTrackerUI();
-        }
-
-        function getNum(id) { return parseInt(document.getElementById(id).value.replace(/,/g, ''), 10) || 0; }
-        function formatNumberInputOnly(input) {
-            let value = input.value.replace(/,/g, '').replace(/[^0-9]/g, '');
-            if (value !== '') input.value = parseInt(value, 10).toLocaleString('ko-KR');
+        function refreshMemoView() {
+            document.getElementById('display-memo-income').innerText = appData.memoIncome || '내용이 없습니다.';
+            document.getElementById('display-memo-fixed').innerText = appData.memoFixed || '내용이 없습니다.';
+            document.getElementById('display-memo-installment').innerText = appData.memoInstallment || '내용이 없습니다.';
+            if(document.getElementById('display-memo-changes')) document.getElementById('display-memo-changes').innerText = appData.memoChanges || '내용이 없습니다.';
         }
 
         let syncTimer; 
-
         function formatAndCalculate(shouldSync = true) {
             const ids = ['income', 'extra-income', 'savings', 'invest', 'fixed', 'subscribe', 'kye', 'installment', 'plan-nh', 'plan-samsung'];
-            
             ids.forEach(id => {
                 let el = document.getElementById(id);
                 if (el) {
@@ -312,7 +393,6 @@
             const available = totalIncome - totalOutflow;
             
             document.getElementById('available-budget').innerText = available.toLocaleString() + '원';
-            
             if(document.getElementById('sum-income')) document.getElementById('sum-income').innerText = totalIncome.toLocaleString() + '원';
             if(document.getElementById('sum-fixed')) document.getElementById('sum-fixed').innerText = totalOutflow.toLocaleString() + '원';
             
@@ -329,14 +409,9 @@
                 document.getElementById('available-budget').style.color = '#1a237e';
             }
 
-            // ★ 이 부분이 빠졌던 이름 짝맞추기 번역기입니다 ★
             ids.forEach(id => {
                 if(document.getElementById(id)) {
-                    let keyName = id;
-                    if (id === 'extra-income') keyName = 'extraIncome';
-                    if (id === 'plan-nh') keyName = 'planNh';
-                    if (id === 'plan-samsung') keyName = 'planSamsung';
-                    
+                    let keyName = id === 'extra-income' ? 'extraIncome' : id === 'plan-nh' ? 'planNh' : id === 'plan-samsung' ? 'planSamsung' : id;
                     appData[keyName] = document.getElementById(id).value;
                 }
             });
@@ -348,12 +423,20 @@
             updateTrackerUI();
         }
 
-        // 3번 탭 메모 저장 로직
-        function saveMemos() {
-            appData.memoIncome = document.getElementById('memo-income').value;
-            appData.memoFixed = document.getElementById('memo-fixed').value;
-            appData.memoInstallment = document.getElementById('memo-installment').value;
-            syncToServer();
+        function getNum(id) { return parseInt(document.getElementById(id).value.replace(/,/g, ''), 10) || 0; }
+        function formatNumberInputOnly(input) {
+            let value = input.value.replace(/,/g, '').replace(/[^0-9]/g, '');
+            if (value !== '') input.value = parseInt(value, 10).toLocaleString('ko-KR');
+        }
+
+        function switchTab(tabName) {
+            ['plan', 'track', 'memo'].forEach(name => {
+                document.getElementById('btn-' + name).classList.remove('active');
+                document.getElementById('tab-' + name).classList.remove('active');
+            });
+            document.getElementById('btn-' + tabName).classList.add('active');
+            document.getElementById('tab-' + tabName).classList.add('active');
+            if(tabName === 'track') updateTrackerUI();
         }
 
         function updateTrackerUI() {
@@ -405,12 +488,11 @@
             const amount = parseInt(document.getElementById('amount').value.replace(/,/g, ''), 10);
             const memo = document.getElementById('memo').value || '-';
             
-            // 사용자가 선택한 날짜 가져오기
             const rawDate = document.getElementById('tx-date').value;
             if (!rawDate) { alert('결제일을 선택해주세요.'); return; }
             
             const dateObj = new Date(rawDate);
-            const dateStr = `${dateObj.getMonth()+1}/${dateObj.getDate()}`; // MM/DD 형식 변환
+            const dateStr = `${dateObj.getMonth()+1}/${dateObj.getDate()}`; 
 
             if (isNaN(amount) || amount <= 0) { alert('정확한 결제 금액을 입력해주세요.'); return; }
 
