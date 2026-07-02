@@ -262,24 +262,16 @@
 
         async function syncToServer() {
 
-            try {
+            const { data, error } = await supabaseClient
+                .from('my_budget_table')
+                .update({
+                    content: appData
+                })
+                .eq('id', 1)
+                .select();
 
-                const { error } = await supabaseClient
-                    .from("my_budget_table")
-                    .update({
-                        content: appData
-                    })
-                    .eq("id", 1);
-
-                if (error) {
-                    console.error(error);
-                }
-
-            } catch (err) {
-
-                console.error(err);
-
-            }
+            console.log("DATA :", data);
+            console.log("ERROR :", error);
 
         }
 
