@@ -96,19 +96,19 @@
             <!-- 고정 지출 섹션 -->
             <div class="card">
                 <div class="section-title-1">2. 지출 내역</div>
-                    <div class="input-row"><label>🏦 적금(선저축)</label><input type="text" id="savings" value="0" oninput="formatAndCalculate()"></div>
-                    <div class="input-row"><label>📄 고정비 (보험 등)</label><input type="text" id="fixed" value="0" oninput="formatAndCalculate()"></div>
-                    <div class="input-row"><label>📺 구독료</label><input type="text" id="subscribe" value="0" oninput="formatAndCalculate()"></div>
-                    <div class="input-row"><label>👨‍👩‍👧‍👦 계/모임비</label><input type="text" id="kye" value="0" oninput="formatAndCalculate()"></div>
-                    <div class="input-row"><label>📈 투자금</label><input type="text" id="invest" value="0" oninput="formatAndCalculate()"></div>
-                    <div class="input-group">
-                        <label>💳 기존 할부금</label>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <input type="text" id="installment" oninput="formatAndCalculate()" placeholder="0" style="flex: 1;">
-                            <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()" title="체크 시 지출 내역에 자동 포함 및 삼성카드 한도 반영" style="width: 18px; height: 18px; cursor: pointer;">
-                        </div>
+                <div class="input-row"><label>🏦 적금(선저축)</label><input type="text" id="savings" value="0" oninput="formatAndCalculate()"></div>
+                <div class="input-row"><label>📄 고정비 (보험 등)</label><input type="text" id="fixed" value="0" oninput="formatAndCalculate()"></div>
+                <div class="input-row"><label>📺 구독료</label><input type="text" id="subscribe" value="0" oninput="formatAndCalculate()"></div>
+                <div class="input-row"><label>👨‍👩‍👧‍👦 계/모임비</label><input type="text" id="kye" value="0" oninput="formatAndCalculate()"></div>
+                <div class="input-row"><label>📈 투자금</label><input type="text" id="invest" value="0" oninput="formatAndCalculate()"></div>
+                <div class="input-group" style="display: flex; justify-content: space-between; align-items: center;">
+                    <label style="margin: 0; flex-shrink: 0;">💳 기존 할부금</label>
+                        
+                    <div style="display: flex; align-items: center; gap: 8px; width: 65%;">
+                        <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()" title="체크 시 지출 내역에 자동 포함" style="width: 18px; height: 18px; margin: 0; cursor: pointer; flex-shrink: 0;">
+                        <input type="text" id="installment" oninput="formatAndCalculate()" placeholder="0" style="width: 100%; text-align: right; margin: 0;">
                     </div>
-                </div>                
+                </div>
             </div>
 
             <!-- 계산 결과 대시보드 -->
