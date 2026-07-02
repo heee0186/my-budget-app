@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <title>통합 재무 관리 시스템</title>
+    <title>💰가계부</title>
     <style>
         body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; color: #333; }
         .header { background: #1a237e; color: white; padding: 15px; text-align: center; font-size: 1.2rem; font-weight: bold; }
@@ -59,12 +59,8 @@
     </style>
 </head>
 <body>
-    <div class="header" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3f51b5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-        </svg>
-        💰가계부
-    </div>
+    <div class="header"> 💰가계부</div>
+
     <div style="text-align: center; padding: 15px; background: white; font-weight: bold; font-size: 1.2rem; border-bottom: 1px solid #eee; position: relative;">
         <button onclick="changeMonth(-1)" style="border:none; background:none; cursor:pointer; font-size:1.2rem; padding:0 20px;">◀</button>
         <span id="month-display">2026년 7월</span>
@@ -107,13 +103,13 @@
                     <div class="input-row"><label>📈 투자금</label><input type="text" id="invest" value="0" oninput="formatAndCalculate()"></div>
                     <div class="input-group">
                         <label>💳 기존 할부금</label>
-                        <input type="text" id="installment" oninput="formatAndCalculate()" placeholder="0">
-                        <label style="display:flex; align-items:center; gap:5px; font-size:0.85rem; color:#555; margin-top:5px; cursor:pointer;">
-                            <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()">
-                            이 할부금을 삼성카드 예산 한도에서 미리 빼기
-                        </label>
-                    </div>                
-                </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="text" id="installment" oninput="formatAndCalculate()" placeholder="0" style="flex: 1;">
+                            <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()" title="체크 시 지출 내역에 자동 포함 및 삼성카드 한도 반영" style="width: 18px; height: 18px; cursor: pointer;">
+                        </div>
+                    </div>
+                </div>                
+            </div>
 
             <!-- 계산 결과 대시보드 -->
             <div class="card" style="border: 2px solid #00796b;">
@@ -167,14 +163,27 @@
                 </div>
                 <div class="input-group">
                     <label>카테고리</label>
-                    <select id="category">
-                        <option value="NH|주유비">🚗 NH카드 - 주유비</option>
-                        <option value="NH|마트/다이소/식재료">🛒 NH카드 - 마트/식재료</option>
-                        <option value="NH|식재료">🥦 NH카드 - 온라인 결제</option>
-                        <option value="NH|요기요/배달">🍔 NH카드 - 요기요/배달</option>
-                        <option value="삼성|타오바오/직구">📦 삼성카드 - 타오바오/직구</option>
-                        <option value="삼성|기타 잡비">💳 삼성카드 - 기타</option>
-                    </select>
+                    <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                        <div style="flex: 1;">
+                            <label style="display:block; font-size:0.85rem; color:#555; margin-bottom:4px;">결제 카드</label>
+                            <select id="tx-card" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
+                                <option value="삼성">삼성카드</option>
+                                <option value="NH">농협카드</option>
+                                <option value="롯데">롯데카드</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="display:block; font-size:0.85rem; color:#555; margin-bottom:4px;">지출 카테고리</label>
+                            <select id="tx-category" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
+                                <option value="마트">마트/식재료</option>
+                                <option value="온라인">온라인쇼핑</option>
+                                <option value="배달">요기요/배달</option>
+                                <option value="직구">직구</option>
+                                <option value="주유">주유비</option>
+                                <option value="기타">기타</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="input-group"><input type="text" id="amount" placeholder="결제 금액 (예: 15,000)" oninput="formatNumberInputOnly(this)"></div>
                 <div class="input-group"><input type="text" id="memo" placeholder="메모(날짜 및 항목 상세 기재)"></div>
@@ -567,17 +576,10 @@
             if(tabName === 'track') updateTrackerUI();
         }
 
-        function updateTrackerUI() {
+       function updateTrackerUI() {
             const targetNh = parseInt(appData.planNh.replace(/,/g, ''), 10) || 0;
-            let targetSamsung = parseInt(appData.planSamsung.replace(/,/g, ''), 10) || 0; // let으로 변경
+            const targetSamsung = parseInt(appData.planSamsung.replace(/,/g, ''), 10) || 0;
 
-            // ★ 할부금 차감 체크박스가 켜져있다면, 삼성카드 목표액에서 빼기
-            if (appData.deductInstallment) {
-            const inst = parseInt((appData.installment || '0').replace(/,/g, ''), 10) || 0;
-            targetSamsung -= inst;
-            
-            }
-    
             document.getElementById('display-nh-plan').innerText = `목표: ${targetNh.toLocaleString()}원`;
             document.getElementById('display-samsung-plan').innerText = `목표: ${targetSamsung.toLocaleString()}원`;
 
@@ -585,21 +587,43 @@
             const historyList = document.getElementById('history-list');
             historyList.innerHTML = '';
 
-            appData.transactions.forEach((t, index) => {
+            // 에러 방지를 위해 원본 인덱스를 보존하며 복사본 생성
+            let displayTransactions = appData.transactions.map((t, idx) => ({ ...t, originalIndex: idx }));
+
+            // ★ 체크박스가 켜져있고 할부금 금액이 있으면 지출 내역 맨 위에 임시 자동 추가
+            if (appData.deductInstallment) {
+                const instAmount = parseInt((appData.installment || '0').replace(/,/g, ''), 10) || 0;
+                if (instAmount > 0) {
+                    displayTransactions.unshift({
+                        card: '삼성',
+                        category: '기타',
+                        amount: instAmount,
+                        memo: '기존 할부금(자동)',
+                        date: '이월',
+                        isAuto: true // 취소 버튼 숨기기용 구분값
+                    });
+                }
+            }
+
+            displayTransactions.forEach((t) => {
                 if (t.card === 'NH') spentNh += t.amount;
                 if (t.card === '삼성') spentSamsung += t.amount;
 
                 const item = document.createElement('div');
                 item.className = 'history-item';
+                
+                // 자동으로 추가된 할부금 내역은 '취소' 버튼이 뜨지 않도록 처리
+                const deleteBtnHtml = t.isAuto ? '' : `<button class="delete-btn" onclick="deleteTransaction(${t.originalIndex})">취소</button>`;
+
                 item.innerHTML = `
                     <div><strong style="color: #3f51b5;">${t.category}</strong><br><span style="color: #666; font-size: 0.85rem;">${t.memo} <span style="color: #aaa;">(${t.date})</span></span></div>
                     <div style="text-align: right;"><strong style="font-size: 1.05rem;">${t.amount.toLocaleString()}원</strong>
-                    <button class="delete-btn" onclick="deleteTransaction(${index})">취소</button></div>
+                    ${deleteBtnHtml}</div>
                 `;
                 historyList.appendChild(item);
             });
 
-            if(appData.transactions.length === 0) historyList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px 0;">지출 내역이 없습니다.</div>';
+            if(displayTransactions.length === 0) historyList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px 0;">지출 내역이 없습니다.</div>';
 
             const remainNh = targetNh - spentNh;
             const remainSamsung = targetSamsung - spentSamsung;
@@ -618,8 +642,10 @@
             if (pctSamsung >= 100) document.getElementById('samsung-bar').classList.add('danger'); else document.getElementById('samsung-bar').classList.remove('danger');
         }
 
-        function addTransaction() {
-            const categorySelect = document.getElementById('category').value.split('|');
+       function addTransaction() {
+            // 분리된 카드와 카테고리에서 각각 값을 가져옵니다.
+            const card = document.getElementById('tx-card').value;
+            const category = document.getElementById('tx-category').value;
             const amount = parseInt(document.getElementById('amount').value.replace(/,/g, ''), 10);
             const memo = document.getElementById('memo').value || '-';
             
@@ -631,7 +657,7 @@
 
             if (isNaN(amount) || amount <= 0) { alert('정확한 결제 금액을 입력해주세요.'); return; }
 
-            appData.transactions.unshift({ card: categorySelect[0], category: categorySelect[1], amount, memo, date: dateStr });
+            appData.transactions.unshift({ card, category, amount, memo, date: dateStr });
             document.getElementById('amount').value = '';
             document.getElementById('memo').value = '';
             
