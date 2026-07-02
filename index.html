@@ -177,37 +177,41 @@
         </div>
 
         <!-- ================= TAB 3: 상세 내역 관리 ================= -->
-        <div id="tab-memo" class="tab-content">
+       <div id="tab-memo" class="tab-content">
             <div class="card">
                 <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>명세서 보관함 (메모장)</span>
+                    <span>명세서 보관함</span>
                     <button id="btn-memo-edit" onclick="toggleMemoEdit()" style="background:#3f51b5; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.9rem;">수정하기</button>
                 </div>
                 
                 <div id="memo-view-mode">
-                    <div class="memo-display-box"><strong>💵 급여 산출 내역:</strong><br><span id="display-memo-income">내용이 없습니다.</span></div>
-                    <div class="memo-display-box"><strong>📄 고정비/구독료 상세:</strong><br><span id="display-memo-fixed">내용이 없습니다.</span></div>
-                    <div class="memo-display-box"><strong>💳 기존 할부금 상세:</strong><br><span id="display-memo-installment">내용이 없습니다.</span></div>
-                    <div class="memo-display-box"><strong>🔄 이번 달 변동 내역:</strong><br><span id="display-memo-changes" style="color: #d32f2f;">내용이 없습니다.</span></div>
+                    <div class="memo-display-box"><strong>💵 급여 산출 내역:</strong><br><div id="display-memo-income" style="margin-top:5px;"></div></div>
+                    <div class="memo-display-box"><strong>📄 고정비/구독료 상세:</strong><br><div id="display-memo-fixed" style="margin-top:5px;"></div></div>
+                    <div class="memo-display-box"><strong>💳 기존 할부금 상세:</strong><br><div id="display-memo-installment" style="margin-top:5px;"></div></div>
+                    <div class="memo-display-box"><strong>🔄 이번 달 변동 내역:</strong><br><span id="display-memo-changes" style="color: #d32f2f; display:block; margin-top:5px;"></span></div>
                 </div>
 
                 <div id="memo-edit-mode" style="display:none;">
-                    <p style="font-size: 0.85rem; color: #666; margin-top: 0; margin-bottom: 15px;">작성을 마친 후 우측 상단의 [등록 완료]를 누르세요.</p>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 0; margin-bottom: 15px;">[+ 추가] 버튼을 눌러 칸을 늘리고, 작성이 끝나면 [등록 완료]를 누르세요.</p>
+                    
                     <div class="input-group">
-                        <label>💵 급여 산출 내역</label>
-                        <textarea id="memo-income" placeholder="급여 상세 내역을 적어두세요."></textarea>
+                        <label style="display:flex; justify-content:space-between; align-items:center;">💵 급여 산출 내역 <button onclick="addMemoRow('income')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
+                        <div id="edit-memo-income"></div>
                     </div>
+                    
                     <div class="input-group">
-                        <label>📄 고정비/구독료 상세</label>
-                        <textarea id="memo-fixed" placeholder="매달 나가는 고정비와 구독료 항목을 적어두세요."></textarea>
+                        <label style="display:flex; justify-content:space-between; align-items:center;">📄 고정비/구독료 상세 <button onclick="addMemoRow('fixed')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
+                        <div id="edit-memo-fixed"></div>
                     </div>
+                    
                     <div class="input-group">
-                        <label>💳 기존 할부금 상세</label>
-                        <textarea id="memo-installment" placeholder="현재 남은 할부 항목과 금액을 적어두세요."></textarea>
+                        <label style="display:flex; justify-content:space-between; align-items:center;">💳 기존 할부금 상세 <button onclick="addMemoRow('installment')" type="button" style="padding:2px 8px; font-size:0.8rem; background:#eee; border:1px solid #ccc; border-radius:4px; cursor:pointer;">+ 추가</button></label>
+                        <div id="edit-memo-installment"></div>
                     </div>
+                    
                     <div class="input-group">
                         <label>🔄 이번 달 변동 내역</label>
-                        <textarea id="memo-changes" placeholder="구독 취소, 추가 지출 등 이번 달 변동 사항을 적어두세요."></textarea>
+                        <textarea id="memo-changes" placeholder="구독 취소, 추가 지출 등 이번 달 변동 사항을 자유롭게 적어두세요."></textarea>
                     </div>
                 </div>
             </div>
@@ -316,7 +320,7 @@
             await supabaseClient.from('my_budget_table').upsert({ id: getViewId(), content: appData });
         }
 
-        function applyDataToUI() {
+       function applyDataToUI() {
             document.getElementById('income').value = appData.income || '0';
             if(document.getElementById('extra-income')) document.getElementById('extra-income').value = appData.extraIncome || '0';
             document.getElementById('savings').value = appData.savings || '0';
@@ -328,36 +332,71 @@
             document.getElementById('plan-nh').value = appData.planNh || '0';
             document.getElementById('plan-samsung').value = appData.planSamsung || '0';
             
-            document.getElementById('memo-income').value = appData.memoIncome || '';
-            document.getElementById('memo-fixed').value = appData.memoFixed || '';
-            document.getElementById('memo-installment').value = appData.memoInstallment || '';
             if(document.getElementById('memo-changes')) document.getElementById('memo-changes').value = appData.memoChanges || '';
+
+            // 항목별 리스트 데이터가 없으면 빈 배열로 준비
+            if(!Array.isArray(appData.memoIncomeList)) appData.memoIncomeList = [];
+            if(!Array.isArray(appData.memoFixedList)) appData.memoFixedList = [];
+            if(!Array.isArray(appData.memoInstallmentList)) appData.memoInstallmentList = [];
 
             refreshMemoView();
             formatAndCalculate(false);
             updateTrackerUI();
 
-            // 탭3 화면 정리 (수정모드로 켜져있으면 보기모드로 원복)
+            // 탭을 켰을 때 기본적으로 '보기 모드'로 세팅
             document.getElementById('memo-view-mode').style.display = 'block';
             document.getElementById('memo-edit-mode').style.display = 'none';
-            document.getElementById('btn-memo-edit').innerText = '수정하기';
-            document.getElementById('btn-memo-edit').style.background = '#3f51b5';
+            
+            const btn = document.getElementById('btn-memo-edit');
+            if(btn) {
+                btn.innerText = '수정하기';
+                btn.style.background = '#3f51b5';
+            }
         }
 
-        // 3번 탭 보기/수정 모드 전환 함수
+        // 보기 모드와 수정 모드를 전환하는 엔진
         function toggleMemoEdit() {
             isMemoEditMode = !isMemoEditMode;
+            const btn = document.getElementById('btn-memo-edit');
+
             if(isMemoEditMode) {
-                // 보기 -> 수정
+                // 보기 -> 수정 모드로 갈 때 (기존 데이터를 입력창으로 변환)
+                document.getElementById('edit-memo-income').innerHTML = '';
+                document.getElementById('edit-memo-fixed').innerHTML = '';
+                document.getElementById('edit-memo-installment').innerHTML = '';
+                
+                appData.memoIncomeList.forEach(item => addMemoRow('income', item));
+                appData.memoFixedList.forEach(item => addMemoRow('fixed', item));
+                appData.memoInstallmentList.forEach(item => addMemoRow('installment', item));
+
+                // 만약 데이터가 하나도 없으면 기본으로 1칸씩 띄워주기
+                if(appData.memoIncomeList.length === 0) addMemoRow('income');
+                if(appData.memoFixedList.length === 0) addMemoRow('fixed');
+                if(appData.memoInstallmentList.length === 0) addMemoRow('installment');
+
                 document.getElementById('memo-view-mode').style.display = 'none';
                 document.getElementById('memo-edit-mode').style.display = 'block';
-                document.getElementById('btn-memo-edit').innerText = '등록 완료';
-                document.getElementById('btn-memo-edit').style.background = '#4CAF50';
+                btn.innerText = '등록 완료';
+                btn.style.background = '#4CAF50';
             } else {
-                // 수정 -> 보기 (저장 처리)
-                appData.memoIncome = document.getElementById('memo-income').value;
-                appData.memoFixed = document.getElementById('memo-fixed').value;
-                appData.memoInstallment = document.getElementById('memo-installment').value;
+                // 수정 -> 보기 모드로 갈 때 (입력창의 데이터를 수집해서 서버에 저장)
+                appData.memoIncomeList = Array.from(document.querySelectorAll('.row-income')).map(row => ({
+                    name: row.querySelector('.i-name').value,
+                    amt: row.querySelector('.i-amt').value
+                })).filter(item => item.name || item.amt);
+
+                appData.memoFixedList = Array.from(document.querySelectorAll('.row-fixed')).map(row => ({
+                    name: row.querySelector('.i-name').value,
+                    amt: row.querySelector('.i-amt').value,
+                    date: row.querySelector('.i-date').value
+                })).filter(item => item.name || item.amt || item.date);
+
+                appData.memoInstallmentList = Array.from(document.querySelectorAll('.row-installment')).map(row => ({
+                    name: row.querySelector('.i-name').value,
+                    amt: row.querySelector('.i-amt').value,
+                    date: row.querySelector('.i-date').value
+                })).filter(item => item.name || item.amt || item.date);
+
                 appData.memoChanges = document.getElementById('memo-changes').value;
                 
                 syncToServer();
@@ -365,16 +404,55 @@
                 
                 document.getElementById('memo-view-mode').style.display = 'block';
                 document.getElementById('memo-edit-mode').style.display = 'none';
-                document.getElementById('btn-memo-edit').innerText = '수정하기';
-                document.getElementById('btn-memo-edit').style.background = '#3f51b5';
+                btn.innerText = '수정하기';
+                btn.style.background = '#3f51b5';
             }
         }
 
+        // 수집된 데이터를 예쁘게 화면에 그려주는 기능
         function refreshMemoView() {
-            document.getElementById('display-memo-income').innerText = appData.memoIncome || '내용이 없습니다.';
-            document.getElementById('display-memo-fixed').innerText = appData.memoFixed || '내용이 없습니다.';
-            document.getElementById('display-memo-installment').innerText = appData.memoInstallment || '내용이 없습니다.';
-            if(document.getElementById('display-memo-changes')) document.getElementById('display-memo-changes').innerText = appData.memoChanges || '내용이 없습니다.';
+            const renderList = (list, hasDate) => {
+                if(!list || list.length === 0) return '<span style="color:#999; font-size:0.9rem;">내용이 없습니다.</span>';
+                return list.map(item => `
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #ccc; padding:6px 0; font-size:0.95rem;">
+                        <span>${item.name || '-'} ${hasDate && item.date ? `<span style="color:#888; font-size:0.85rem; margin-left:4px;">(${item.date}일)</span>` : ''}</span>
+                        <span><strong style="color:#3f51b5;">${item.amt || '0'}</strong></span>
+                    </div>
+                `).join('');
+            };
+
+            document.getElementById('display-memo-income').innerHTML = renderList(appData.memoIncomeList, false);
+            document.getElementById('display-memo-fixed').innerHTML = renderList(appData.memoFixedList, true);
+            document.getElementById('display-memo-installment').innerHTML = renderList(appData.memoInstallmentList, true);
+            
+            if(document.getElementById('display-memo-changes')) {
+                document.getElementById('display-memo-changes').innerText = appData.memoChanges || '내용이 없습니다.';
+                document.getElementById('display-memo-changes').style.whiteSpace = 'pre-wrap'; // 줄바꿈 유지
+            }
+        }
+
+        // '추가' 버튼을 눌렀을 때 입력칸(행)을 만들어주는 기능
+        function addMemoRow(type, data = {}) {
+            const container = document.getElementById(`edit-memo-${type}`);
+            const div = document.createElement('div');
+            div.className = `row-${type}`;
+            div.style.display = 'flex';
+            div.style.gap = '5px';
+            div.style.marginBottom = '8px';
+
+            // 급여는 날짜 제외, 나머지는 날짜 포함
+            let dateInput = '';
+            if(type !== 'income') {
+                dateInput = `<input type="text" class="i-date" placeholder="날짜(일)" value="${data.date || ''}" style="width:25%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">`;
+            }
+
+            div.innerHTML = `
+                <input type="text" class="i-name" placeholder="항목명" value="${data.name || ''}" style="width:${type === 'income' ? '50%' : '40%'}; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
+                <input type="text" class="i-amt" placeholder="금액" value="${data.amt || ''}" style="width:${type === 'income' ? '40%' : '25%'}; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
+                ${dateInput}
+                <button onclick="this.parentElement.remove()" style="width:10%; background:#f44336; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">X</button>
+            `;
+            container.appendChild(div);
         }
 
         let syncTimer; 
