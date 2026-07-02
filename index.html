@@ -38,7 +38,7 @@
         .success-box { background: #e8f5e9; color: #2e7d32; padding: 15px; border-radius: 8px; text-align: center; font-weight: bold; display: none; margin-top: 10px; }
 
         .budget-title { font-size: 1rem; color: #666; margin-bottom: 10px; font-weight: bold; display: flex; justify-content: space-between; }
-        .budget-amount { font-size: 1.5rem; font-weight: bold; color: #1a237e; margin-bottom: 5px; }
+        .budget-amount { font-size: 1.5rem; font-weight: bold; color: #2e7d32; margin-bottom: 5px; }
         .progress-bar { width: 100%; background: #e0e0e0; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 10px; }
         .progress-fill { height: 100%; background: #3f51b5; transition: width 0.3s; }
         .danger { background: #f44336; }
@@ -72,7 +72,7 @@
     <!-- 상단 탭 -->
     <div class="tab-nav">
         <div class="tab-btn active" id="btn-plan" onclick="switchTab('plan')">📋 1. 월간 설계</div>
-        <div class="tab-btn" id="btn-track" onclick="switchTab('track')">💳 2. 지출 통제</div>
+        <div class="tab-btn" id="btn-track" onclick="switchTab('track')">💳 2. 지출 내역</div>
         <div class="tab-btn" id="btn-memo" onclick="switchTab('memo')">📝 3. 상세 내역</div>
     </div>
 
@@ -103,7 +103,7 @@
                 <div class="input-row"><label>👨‍👩‍👧‍👦 계/모임비</label><input type="text" id="kye" value="0" oninput="formatAndCalculate()"></div>
                 <div class="input-row"><label>📈 투자금</label><input type="text" id="invest" value="0" oninput="formatAndCalculate()"></div>
                 <div class="input-group" style="display: flex; justify-content: space-between; align-items: center;">
-                    <label style="margin: 0; flex-shrink: 0;">💳 기존 할부금</label>
+                    <label style="margin: 0; flex-shrink: 0;">💳 할부금</label>
                         
                     <div style="display: flex; align-items: center; gap: 8px; width: 60%;">
                         <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()" title="체크 시 지출 내역에 자동 포함" style="width: 18px; height: 18px; margin: 0; cursor: pointer; flex-shrink: 0;">
@@ -126,7 +126,7 @@
                 </div>
                 
                 <div class="result-box">
-                    <div class="result-title">이번 달 새로 긁을 수 있는 최대 카드값</div>
+                    <div class="result-title">이번 달 남은 예산</div>
                     <div class="result-amount" id="available-budget">0원</div>
                     <div style="font-size: 0.8rem; color: #666; margin-top: 5px;">(이 금액을 넘기면 마통 빚이 늘어납니다)</div>
                 </div>
@@ -134,9 +134,9 @@
 
             <!-- 카드별 한도 배분 섹션 -->
             <div class="card">
-                <div class="section-title-1">카드별 한도 배분</div>
-                <div class="input-row"><label>🚗 NH카드 한도</label><input type="text" id="plan-nh" value="0" oninput="formatAndCalculate()"></div>
-                <div class="input-row"><label>🛒 삼성카드 한도</label><input type="text" id="plan-samsung" value="0" oninput="formatAndCalculate()"></div>
+                <div class="section-title-1">카드별 예산 배분</div>
+                <div class="input-row"><label>🛒 NH카드 예산</label><input type="text" id="plan-nh" value="0" oninput="formatAndCalculate()"></div>
+                <div class="input-row"><label>✈️ 삼성카드 예산</label><input type="text" id="plan-samsung" value="0" oninput="formatAndCalculate()"></div>
                 <div id="alert-deficit" class="alert-box">⚠️ 한도가 유동가능 현금을 초과했습니다!</div>
                 <div id="alert-surplus" class="success-box">🎉 완벽합니다!<br>(마통 상환 여유액: <span id="surplus-amount">0</span>원)</div>
             </div>
@@ -145,13 +145,13 @@
         <!-- ================= TAB 2: 지출 통제 ================= -->
         <div id="tab-track" class="tab-content">
             <div class="card">
-                <div class="budget-title"><span>🚗 NH 농협 카드</span><span id="display-nh-plan" style="color: #1a237e;">목표: 0원</span></div>
+                <div class="budget-title"><span>🛒 NH 농협 카드</span><span id="display-nh-plan" style="color: #1a237e;">목표: 0원</span></div>
                 <div class="budget-amount" id="nh-remain">남은 예산: 0원</div>
                 <div class="progress-bar"><div class="progress-fill" id="nh-bar" style="width: 0%;"></div></div>
             </div>
             
             <div class="card">
-                <div class="budget-title"><span>🛒 삼성 iD GLOBAL</span><span id="display-samsung-plan" style="color: #1a237e;">목표: 0원</span></div>
+                <div class="budget-title"><span>✈️ 삼성 iD GLOBAL</span><span id="display-samsung-plan" style="color: #1a237e;">목표: 0원</span></div>
                 <div class="budget-amount" id="samsung-remain">남은 예산: 0원</div>
                 <div class="progress-bar"><div class="progress-fill" id="samsung-bar" style="width: 0%;"></div></div>
             </div>
@@ -634,13 +634,27 @@
             document.getElementById('samsung-remain').innerText = `남은 예산: ${remainSamsung.toLocaleString()}원`;
             document.getElementById('samsung-remain').style.color = remainSamsung < 0 ? '#f44336' : '#1a237e';
 
-            const pctNh = targetNh > 0 ? Math.min(100, (spentNh / targetNh) * 100) : 100;
-            const pctSamsung = targetSamsung > 0 ? Math.min(100, (spentSamsung / targetSamsung) * 100) : 100;
+            // (기존 코드의 pctNh, pctSamsung 계산 부분부터 함수 끝까지 덮어쓰세요)
+            
+            // 남은 예산 비율 계산 (0% 밑으로는 뚫고 나가지 않게 방어)
+            const pctNh = targetNh > 0 ? Math.max(0, 100 - (spentNh / targetNh) * 100) : 0;
+            const pctSamsung = targetSamsung > 0 ? Math.max(0, 100 - (spentSamsung / targetSamsung) * 100) : 0;
 
             document.getElementById('nh-bar').style.width = pctNh + '%';
-            if (pctNh >= 100) document.getElementById('nh-bar').classList.add('danger'); else document.getElementById('nh-bar').classList.remove('danger');
+            // 예산이 20% 이하로 떨어지면 막대기를 빨간색(danger)으로 변경
+            if (pctNh <= 20) {
+                document.getElementById('nh-bar').classList.add('danger');
+            } else {
+                document.getElementById('nh-bar').classList.remove('danger');
+            }
+            
             document.getElementById('samsung-bar').style.width = pctSamsung + '%';
-            if (pctSamsung >= 100) document.getElementById('samsung-bar').classList.add('danger'); else document.getElementById('samsung-bar').classList.remove('danger');
+            if (pctSamsung <= 20) {
+                document.getElementById('samsung-bar').classList.add('danger');
+            } else {
+                document.getElementById('samsung-bar').classList.remove('danger');
+            }
+            
         }
 
        function addTransaction() {
