@@ -244,6 +244,8 @@
 
         function applyDataToUI() {
             document.getElementById('income').value = appData.income || '0';
+            // 부수입 불러오기 추가
+            if(document.getElementById('extra-income')) document.getElementById('extra-income').value = appData.extraIncome || '0'; 
             document.getElementById('savings').value = appData.savings || '0';
             document.getElementById('invest').value = appData.invest || '0';
             document.getElementById('fixed').value = appData.fixed || '0';
@@ -292,10 +294,9 @@
             if (value !== '') input.value = parseInt(value, 10).toLocaleString('ko-KR');
         }
 
-        let syncTimer; // 서버 과부하 방지용 타이머
+        let syncTimer; 
 
         function formatAndCalculate(shouldSync = true) {
-            // 1. 계산 목록에 'extra-income' 추가 완료
             const ids = ['income', 'extra-income', 'savings', 'invest', 'fixed', 'subscribe', 'kye', 'installment', 'plan-nh', 'plan-samsung'];
             
             ids.forEach(id => {
@@ -306,14 +307,12 @@
                 }
             });
 
-            // 2. 부수입이 포함되도록 수입 계산식 수정
             const totalIncome = getNum('income') + getNum('extra-income');
             const totalOutflow = getNum('savings') + getNum('invest') + getNum('fixed') + getNum('subscribe') + getNum('kye') + getNum('installment');
             const available = totalIncome - totalOutflow;
             
             document.getElementById('available-budget').innerText = available.toLocaleString() + '원';
             
-            // HTML에 추가하신 수입/지출 합계 표시 기능 살림
             if(document.getElementById('sum-income')) document.getElementById('sum-income').innerText = totalIncome.toLocaleString() + '원';
             if(document.getElementById('sum-fixed')) document.getElementById('sum-fixed').innerText = totalOutflow.toLocaleString() + '원';
             
@@ -330,13 +329,18 @@
                 document.getElementById('available-budget').style.color = '#1a237e';
             }
 
+            // ★ 이 부분이 빠졌던 이름 짝맞추기 번역기입니다 ★
             ids.forEach(id => {
                 if(document.getElementById(id)) {
-                    appData[id] = document.getElementById(id).value;
+                    let keyName = id;
+                    if (id === 'extra-income') keyName = 'extraIncome';
+                    if (id === 'plan-nh') keyName = 'planNh';
+                    if (id === 'plan-samsung') keyName = 'planSamsung';
+                    
+                    appData[keyName] = document.getElementById(id).value;
                 }
             });
             
-            // 3. 과부하 방지: 타이머를 둬서 타이핑이 끝나고 1초 뒤에 딱 한 번만 서버에 저장
             if (shouldSync) {
                 clearTimeout(syncTimer);
                 syncTimer = setTimeout(() => { syncToServer(); }, 1000);
