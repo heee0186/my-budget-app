@@ -150,13 +150,13 @@
         <!-- ================= TAB 2: 지출 통제 ================= -->
         <div id="tab-track" class="tab-content">
             <div class="card">
-                <div class="budget-title"><span>🛒 NH 농협 카드</span><span id="display-nh-plan" style="color: #1a237e;">목표: 0원</span></div>
+                <div class="budget-title"><span>🛒 NH 농협 카드</span><span id="display-nh-plan" style="color: #4593a0;">목표: 0원</span></div>
                 <div class="budget-amount" id="nh-remain">남은 예산: 0원</div>
                 <div class="progress-bar"><div class="progress-fill" id="nh-bar" style="width: 0%;"></div></div>
             </div>
             
             <div class="card">
-                <div class="budget-title"><span>✈️ 삼성 iD GLOBAL</span><span id="display-samsung-plan" style="color: #1a237e;">목표: 0원</span></div>
+                <div class="budget-title"><span>✈️ 삼성 iD GLOBAL</span><span id="display-samsung-plan" style="color: #409ecc;">목표: 0원</span></div>
                 <div class="budget-amount" id="samsung-remain">남은 예산: 0원</div>
                 <div class="progress-bar"><div class="progress-fill" id="samsung-bar" style="width: 0%;"></div></div>
             </div>
@@ -167,7 +167,7 @@
                     <label>결제일</label>
                     <input type="date" id="tx-date">
                 </div>
-                <div class="input-group" style="margin-bottom: 15px; padding: 12px; background: #e2e7ff; border-radius: 4px; border: 1px solid #ccc;">
+                <div class="input-group" style="margin-bottom: 15px; padding: 12px; background: #eff8ff; border-radius: 4px; border: 1px solid #ccc;">
                     <label>💬 카톡/문자 자동 입력</label>
                     <textarea id="sms-input" rows="2" placeholder="여기에 결제 문자를 붙여 넣으세요" style="width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; resize: none;" oninput="parseAndFillSms()"></textarea>
                 </div>
@@ -677,9 +677,9 @@
             const remainSamsung = targetSamsung - spentSamsung;
 
             document.getElementById('nh-remain').innerText = `남은 예산: ${remainNh.toLocaleString()}원`;
-            document.getElementById('nh-remain').style.color = remainNh < 0 ? '#f44336' : '#1a237e';
+            document.getElementById('nh-remain').style.color = remainNh < 0 ? '#f44336' : '#4593a0';
             document.getElementById('samsung-remain').innerText = `남은 예산: ${remainSamsung.toLocaleString()}원`;
-            document.getElementById('samsung-remain').style.color = remainSamsung < 0 ? '#f44336' : '#1a237e';
+            document.getElementById('samsung-remain').style.color = remainSamsung < 0 ? '#f44336' : '#409ecc';
 
             // (기존 코드의 pctNh, pctSamsung 계산 부분부터 함수 끝까지 덮어쓰세요)
             
