@@ -773,33 +773,22 @@
                 document.getElementById('tx-date').value = `${yyyy}-${m}-${d}`;
             }
             
-            // 4. 결제처(가맹점) 추출 고도화 (유연한 조각내기 + 안전장치)
-            let merchant = "";
-            const chunks = text.split(/[\n\r]+/); // 줄바꿈을 기준으로 나눔
-            
-            for (let chunk of chunks) {
-                chunk = chunk.trim();
-                
-                // 명백하게 가맹점이 아닌 줄만 건너뜁니다.
-                if (!chunk) continue;
-                if (/[0-9,]+\s*원/.test(chunk)) continue; // 금액 줄 건너뛰기
-                if (/\d{2}:\d{2}/.test(chunk)) continue; // 시간 줄 건너뛰기
-                if (/Web발신|승인|취소|잔액|누적/.test(chunk)) continue; // 카드사 뻔한 안내 멘트 건너뛰기
-                if (/^[가-힣]\*[가-힣]$/.test(chunk)) continue; // '홍*동' 처럼 딱 3글자 이름 마스킹만 있는 줄 건너뛰기
-                
-                // 위 조건에 안 걸렸다면 가맹점일 확률이 가장 높습니다.
-                merchant = chunk;
-                
-                // 단, 가맹점 이름 옆에 붙은 꼬리표만 살짝 떼어줍니다.
-                merchant = merchant.replace(/\(전자상거래\)|전자상거래이용/g, '').trim();
-                break; 
-            }
-            
-            // ★ 강력한 안전장치: 만약 필터링 때문에 텅 비어버렸다면, 원본 문자 일부라도 억지로 집어넣습니다.
-            if (!merchant) {
-                merchant = text.replace(/[\n\r]+/g, ' ').substring(0, 15);
-            }
-            
+            // 4. 확실한 메모(가맹점) 추출 (스마트 소거법)
+            let merchant = text;
+
+            // 이름 마스킹(홍*동님), 카드사, 쓸데없는 안내말 싹 지우기
+            merchant = merchant.replace(/[가-힣]\*[가-힣]님?/g, ''); // 가운데 별표 있는 3글자 이름 알아서 삭제
+            merchant = merchant.replace(/삼성카드|NH카드|농협카드/ig, '');
+            merchant = merchant.replace(/전자상거래(?:이용)?|일시불|승인|취소|누적|잔액|Web발신/ig, '');
+
+            // 이미 칸에 채워넣은 금액, 날짜, 시간도 텍스트에서 지우기
+            merchant = merchant.replace(/[0-9,]+\s*원/g, ''); 
+            merchant = merchant.replace(/\d{1,2}[\/\.]\d{1,2}/g, ''); 
+            merchant = merchant.replace(/\d{2}:\d{2}(?::\d{2})?/g, ''); 
+
+            // 남은 찌꺼기(특수기호, 줄바꿈) 날리고, 여러 칸 띄어쓰기를 하나로 압축
+            merchant = merchant.replace(/[\n\r\[\]\(\)]/g, ' ').replace(/\s+/g, ' ').trim();
+
             document.getElementById('memo').value = merchant;
         }
 
