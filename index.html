@@ -773,20 +773,27 @@
                 document.getElementById('tx-date').value = `${yyyy}-${m}-${d}`;
             }
             
-            // 4. 결제처(가맹점)만 스마트하게 뽑아내기
-            // 대부분의 카드 문자는 '14:25' 같은 시간 바로 뒤에 상호명이 옵니다.
-            let merchantName = "";
-            const timeMatch = text.match(/\d{2}:\d{2}(?::\d{2})?\s+(.*)/);
+            // 4. 결제처(가맹점) 추출 고도화: '조각내서 거르기' 방식
+            // 문자를 줄바꿈(엔터) 기준으로 나누고, 엔터가 없으면 띄어쓰기 기준으로 토막 냅니다.
+            const chunks = text.split(/[\n\r]+/).length > 1 ? text.split(/[\n\r]+/) : text.split(/\s+/);
+            let merchant = "";
             
-            if (timeMatch) {
-                // 시간 뒤의 텍스트를 가져와서 '승인', '누적', '잔액' 등의 불필요한 단어를 잘라냅니다.
-                merchantName = timeMatch[1].split(/승인|누적|잔액|일시불/)[0].trim();
-            } else {
-                // 만약 문자 양식이 달라서 시간을 못 찾으면, 너무 길지 않게 앞부분만 임시로 넣습니다.
-                merchantName = text.replace(/\n/g, ' ').substring(0, 15); 
+            for (let chunk of chunks) {
+                chunk = chunk.trim();
+                if (!chunk) continue;
+                
+                // 아래 조건에 해당하는 조각들은 상호명이 아니므로 패스(continue)합니다.
+                if (/[0-9,]+\s*원/.test(chunk)) continue; // 금액 (예: 15,000원)
+                if (/\d{2}:\d{2}/.test(chunk) || /\d{1,2}[\/\.]\d{1,2}/.test(chunk)) continue; // 날짜 및 시간 (예: 14:30, 07/04)
+                if (/카드|승인|일시불|할부|누적|잔액|전자상거래/.test(chunk)) continue; // 뻔한 안내 문구
+                if (/\*/.test(chunk)) continue; // 홍*동, 12** 등 이름이나 카드번호 마스킹
+                
+                // 위 관문을 모두 무사히 통과했다면 그게 바로 상호명입니다!
+                merchant = chunk;
+                break; // 상호명을 찾았으므로 더 이상 뒤지지 않고 멈춥니다.
             }
             
-            document.getElementById('memo').value = merchantName;
+            document.getElementById('memo').value = merchant;
         }
 
 
