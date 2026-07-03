@@ -165,12 +165,11 @@
                     <label>결제일</label>
                     <input type="date" id="tx-date">
                 </div>
-                <div style="margin-bottom: 15px; padding: 12px; background: #e8eaf6; border-radius: 4px; border: 1px dashed #3f51b5;">
-                    <label style="display:flex; justify-content:space-between; font-size:0.85rem; color:#3f51b5; margin-bottom:8px; font-weight:bold;">
-                        💬 카톡/문자 알림 붙여넣기
-                        <span style="font-size:0.75rem; color:#777; font-weight:normal;">(자동 채움)</span>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; font-size:0.85rem; color:#555; margin-bottom:4px;">
+                        💬 카톡/문자 자동 입력
                     </label>
-                    <textarea id="sms-input" rows="2" placeholder="여기에 복사한 결제 알림을 붙여넣으세요." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; resize: none;" oninput="parseAndFillSms()"></textarea>
+                    <textarea id="sms-input" rows="2" placeholder="여기에 결제 문자를 붙여 넣으세요" style="width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; resize: none;" oninput="parseAndFillSms()"></textarea>
                 </div>
                 <div class="input-group">
                     <label>카테고리</label>
@@ -746,27 +745,26 @@
             }
         }
 
-        // 카톡/문자 텍스트를 분석해서 입력칸에 자동으로 채워주는 함수
+       // 카톡/문자 텍스트를 분석해서 입력칸에 자동으로 채워주는 함수
         function parseAndFillSms() {
             const text = document.getElementById('sms-input').value;
             if (!text.trim()) return;
 
-            // 1. 카드사 찾기 (삼성, 농협/NH 단어 감지)
+            // 1. 카드사 찾기
             if (text.includes('삼성') || text.toLowerCase().includes('samsung')) {
                 document.getElementById('tx-card').value = '삼성';
             } else if (text.includes('농협') || text.toLowerCase().includes('nh')) {
                 document.getElementById('tx-card').value = 'NH';
             }
 
-            // 2. 금액 찾기 (예: 15,000원 -> 15000 추출)
+            // 2. 금액 찾기
             const amtMatch = text.match(/([0-9,]+)\s*원/);
             if (amtMatch) {
-                // 쉼표 제거하고 금액 칸에 넣기
                 document.getElementById('amount').value = amtMatch[1].replace(/,/g, ''); 
-                formatAndCalculate(); // 쉼표 포맷팅 함수 실행
+                formatAndCalculate(); 
             }
 
-            // 3. 날짜 찾기 (예: 07/04 또는 07.04 추출)
+            // 3. 날짜 찾기
             const dateMatch = text.match(/([0-1]?[0-9])[\/\.]([0-3]?[0-9])/);
             if (dateMatch) {
                 const m = dateMatch[1].padStart(2, '0');
@@ -775,9 +773,20 @@
                 document.getElementById('tx-date').value = `${yyyy}-${m}-${d}`;
             }
             
-            // 사용처(가맹점)는 양식이 너무 다양해서 메모칸에 일단 원본 텍스트를 다 넣어줍니다.
-            // 사용자가 필요한 부분만 남기고 지우는 게 더 빠릅니다.
-            document.getElementById('memo').value = text.replace(/\n/g, ' '); 
+            // 4. 결제처(가맹점)만 스마트하게 뽑아내기
+            // 대부분의 카드 문자는 '14:25' 같은 시간 바로 뒤에 상호명이 옵니다.
+            let merchantName = "";
+            const timeMatch = text.match(/\d{2}:\d{2}(?::\d{2})?\s+(.*)/);
+            
+            if (timeMatch) {
+                // 시간 뒤의 텍스트를 가져와서 '승인', '누적', '잔액' 등의 불필요한 단어를 잘라냅니다.
+                merchantName = timeMatch[1].split(/승인|누적|잔액|일시불/)[0].trim();
+            } else {
+                // 만약 문자 양식이 달라서 시간을 못 찾으면, 너무 길지 않게 앞부분만 임시로 넣습니다.
+                merchantName = text.replace(/\n/g, ' ').substring(0, 15); 
+            }
+            
+            document.getElementById('memo').value = merchantName;
         }
 
 
