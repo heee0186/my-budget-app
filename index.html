@@ -773,24 +773,31 @@
                 document.getElementById('tx-date').value = `${yyyy}-${m}-${d}`;
             }
             
-            // 4. 결제처(가맹점) 추출 고도화: '조각내서 거르기' 방식
-            // 문자를 줄바꿈(엔터) 기준으로 나누고, 엔터가 없으면 띄어쓰기 기준으로 토막 냅니다.
-            const chunks = text.split(/[\n\r]+/).length > 1 ? text.split(/[\n\r]+/) : text.split(/\s+/);
+            // 4. 결제처(가맹점) 추출 고도화 (유연한 조각내기 + 안전장치)
             let merchant = "";
+            const chunks = text.split(/[\n\r]+/); // 줄바꿈을 기준으로 나눔
             
             for (let chunk of chunks) {
                 chunk = chunk.trim();
+                
+                // 명백하게 가맹점이 아닌 줄만 건너뜁니다.
                 if (!chunk) continue;
+                if (/[0-9,]+\s*원/.test(chunk)) continue; // 금액 줄 건너뛰기
+                if (/\d{2}:\d{2}/.test(chunk)) continue; // 시간 줄 건너뛰기
+                if (/Web발신|승인|취소|잔액|누적/.test(chunk)) continue; // 카드사 뻔한 안내 멘트 건너뛰기
+                if (/^[가-힣]\*[가-힣]$/.test(chunk)) continue; // '홍*동' 처럼 딱 3글자 이름 마스킹만 있는 줄 건너뛰기
                 
-                // 아래 조건에 해당하는 조각들은 상호명이 아니므로 패스(continue)합니다.
-                if (/[0-9,]+\s*원/.test(chunk)) continue; // 금액 (예: 15,000원)
-                if (/\d{2}:\d{2}/.test(chunk) || /\d{1,2}[\/\.]\d{1,2}/.test(chunk)) continue; // 날짜 및 시간 (예: 14:30, 07/04)
-                if (/카드|승인|일시불|할부|누적|잔액|전자상거래/.test(chunk)) continue; // 뻔한 안내 문구
-                if (/\*/.test(chunk)) continue; // 홍*동, 12** 등 이름이나 카드번호 마스킹
-                
-                // 위 관문을 모두 무사히 통과했다면 그게 바로 상호명입니다!
+                // 위 조건에 안 걸렸다면 가맹점일 확률이 가장 높습니다.
                 merchant = chunk;
-                break; // 상호명을 찾았으므로 더 이상 뒤지지 않고 멈춥니다.
+                
+                // 단, 가맹점 이름 옆에 붙은 꼬리표만 살짝 떼어줍니다.
+                merchant = merchant.replace(/\(전자상거래\)|전자상거래이용/g, '').trim();
+                break; 
+            }
+            
+            // ★ 강력한 안전장치: 만약 필터링 때문에 텅 비어버렸다면, 원본 문자 일부라도 억지로 집어넣습니다.
+            if (!merchant) {
+                merchant = text.replace(/[\n\r]+/g, ' ').substring(0, 15);
             }
             
             document.getElementById('memo').value = merchant;
