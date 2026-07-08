@@ -179,6 +179,7 @@
                                 <option value="삼성">삼성카드</option>
                                 <option value="NH">농협카드</option>
                                 <option value="롯데">롯데카드</option>
+                                <option value="현금">현금</option>
                             </select>
                         </div>
                         <div style="flex: 1;">
@@ -200,6 +201,22 @@
 
             <div class="card">
                 <div class="section-title" style="border: none;">이번 달 지출 내역</div>
+                <div style="margin-top: 20px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden;">
+                    <div onclick="toggleBillCalc()" style="background: #f5f5f5; padding: 12px; cursor: pointer; text-align: center; font-weight: bold; color: #1a237e;">
+                    👇 다가오는 18일 카드 청구 대금 확인하기
+                    </div>
+                    <div id="bill-calc-content" style="display: none; padding: 15px; background: #fff; border-top: 1px solid #ccc;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                            <span style="color: #555;">농협카드 <span style="font-size:0.8rem;">(전월5일~당월4일)</span>:</span>
+                            <strong id="bill-nh" style="color:#d32f2f; font-size:1.1rem;">계산 중...</strong>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span style="color: #555;">삼성카드 <span style="font-size:0.8rem;">(전월6일~당월5일)</span>:</span>
+                            <strong id="bill-samsung" style="color:#d32f2f; font-size:1.1rem;">계산 중...</strong>
+                        </div>
+                        <p style="font-size:0.8rem; color:#888; margin-top:12px; margin-bottom:0; text-align:center;">* 이번 달 18일에 통장에서 빠져나갈 정확한 금액입니다.</p>
+                    </div>
+                </div>
                 <div id="history-list" class="history"></div>
                 <button class="reset-btn" onclick="clearTransactions()">지출 내역 전체 초기화</button>
             </div>
@@ -354,7 +371,7 @@
             const forceEditBtn = document.getElementById('btn-force-edit');
 
             if (isPast && !forceEditMode) {
-                displayEl.innerText = `${viewYear}년 ${viewMonth}월 (잠김)`;
+                displayEl.innerText = `${viewYear}년 ${viewMonth}월 `;
                 displayEl.style.color = '#f44336';
                 forceEditBtn.style.display = 'inline-block'; // 잠금 풀기 버튼 표시
             } else {
@@ -797,7 +814,79 @@
             document.getElementById('memo').value = merchant;
         }
 
+        // 다가오는 카드 청구 대금을 정확한 날짜 기준으로 계산하는 함수
+        async function toggleBillCalc() {
+            const contentDiv = document.getElementById('bill-calc-content');
+            
+            // 창이 열려있으면 닫기
+            if (contentDiv.style.display === 'block') {
+                contentDiv.style.display = 'none';
+                return;
+            }
+            
+            // 창 열고 계산 시작
+            contentDiv.style.display = 'block';
+            document.getElementById('bill-nh').innerText = '계산 중...';
+            document.getElementById('bill-samsung').innerText = '계산 중...';
 
+            // 지난달 데이터 ID 찾기
+            let prevMonth = viewMonth === 1 ? 12 : viewMonth - 1;
+            let prevYear = viewMonth === 1 ? viewYear - 1 : viewYear;
+            let prevId = prevYear * 100 + prevMonth;
+
+            let prevTransactions = [];
+            try {
+                // 수파베이스에서 지난달 지출 내역만 몰래 가져오기
+                const { data } = await supabaseClient.from('my_budget_table').select('content').eq('id', prevId);
+                if (data && data.length > 0 && data[0].content && data[0].content.transactions) {
+                    prevTransactions = data[0].content.transactions;
+                }
+            } catch (err) {
+                console.error("이전 달 데이터 불러오기 실패", err);
+            }
+
+            // 지난달 지출 내역 + 이번 달 지출 내역 합치기
+            const allTx = [...prevTransactions, ...(appData.transactions || [])];
+
+            let sumNh = 0;
+            let sumSamsung = 0;
+
+            // 합친 내역들을 하나씩 검사하면서 조건에 맞는 것만 더하기
+            allTx.forEach(t => {
+                if (!t.date || !t.amount) return;
+                
+                let txMonth = -1, txDay = -1;
+                // 날짜가 '7/4' 또는 '2026-07-04' 어떤 형태로 되어있든 월(Month)과 일(Day)을 정확히 뽑아냄
+                if (t.date.includes('/')) {
+                    const parts = t.date.split('/');
+                    txMonth = parseInt(parts[0], 10);
+                    txDay = parseInt(parts[1], 10);
+                } else if (t.date.includes('-')) {
+                    const parts = t.date.split('-');
+                    txMonth = parseInt(parts[1], 10);
+                    txDay = parseInt(parts[2], 10);
+                }
+
+                if (txMonth === -1 || txDay === -1) return;
+
+                // 농협: 전월 5일 이후 ~ 당월 4일 이전
+                if (t.card === 'NH') {
+                    if ((txMonth === prevMonth && txDay >= 5) || (txMonth === viewMonth && txDay <= 4)) {
+                        sumNh += t.amount;
+                    }
+                } 
+                // 삼성: 전월 6일 이후 ~ 당월 5일 이전
+                else if (t.card === '삼성') {
+                    if ((txMonth === prevMonth && txDay >= 6) || (txMonth === viewMonth && txDay <= 5)) {
+                        sumSamsung += t.amount;
+                    }
+                }
+            });
+
+            // 계산된 금액을 화면에 천단위 쉼표 찍어서 표시
+            document.getElementById('bill-nh').innerText = sumNh.toLocaleString() + '원';
+            document.getElementById('bill-samsung').innerText = sumSamsung.toLocaleString() + '원';
+        }
 
         // ★ 설정하실 비밀번호를 이곳에 입력하세요 (기본값: 1234)
         const MEMO_PASSWORD = "1106";
