@@ -715,16 +715,22 @@
                 const deleteBtnHtml = t.isAuto ? '' : `<button class="delete-btn" onclick="deleteTransaction(${t.originalIndex})">취소</button>`;
 
                 item.innerHTML = `
-                    <div><strong style="color: #3f51b5;">${t.category}</strong><br>
-                        <span style="color: #666; font-size: 0.85rem;">${t.memo} 
-                            <span style="color: #aaa;">(${t.date})</span>
-                            <span style="display: inline-block; padding: 2px 5px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-right: 4px; vertical-align: middle;">${t.card}</span>
-                        </span>
-                    </div>
-                    <div style="text-align: right;"><strong style="font-size: 1.05rem;">${t.amount.toLocaleString()}원</strong>
-                    ${deleteBtnHtml}</div>
-                `;
-                historyList.appendChild(item);
+                        <div style="flex: 1; min-width: 0; padding-right: 10px;">
+                            <div style="margin-bottom: 2px;">
+                                <strong style="color: #3f51b5; font-size: 1rem;">${t.category}</strong>
+                                <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; vertical-align: middle;">${t.card}</span>
+                            </div>
+                            <div style="color: #666; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                ${t.memo} <span style="color: #aaa;">(${t.date})</span>
+                            </div>
+                        </div>
+
+                        <div style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                            <strong style="font-size: 1.05rem; color: #333;">${t.amount.toLocaleString()}원</strong>
+                            ${deleteBtnHtml}
+                        </div>
+                    `;
+                    historyList.appendChild(item);
             });
 
             if(displayTransactions.length === 0) historyList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px 0;">지출 내역이 없습니다.</div>';
