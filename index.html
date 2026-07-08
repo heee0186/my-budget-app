@@ -63,21 +63,21 @@
         #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; font-weight: bold; color: #1a237e; }
         .memo-display-box { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 4px; padding: 4px 8px; /* 위아래 패딩을 4px로 대폭 줄임 */margin-bottom: 6px; font-size: 0.85rem; }
 
-        /* ★ 지출 내역 스크롤바 예쁘게 꾸미기 ★ */
-        #history-list::-webkit-scrollbar {
-            width: 4px; /* 스크롤바 굵기 */
-        }
-        #history-list::-webkit-scrollbar-track {
-            background: #f4f6f8; /* 스크롤바가 다니는 길 색상 */
-            border-radius: 4px;
-        }
-        #history-list::-webkit-scrollbar-thumb {
-            background: #c1c9d2; /* 스크롤바 막대기 색상 */
-            border-radius: 4px;
-        }
-        #history-list::-webkit-scrollbar-thumb:hover {
-            background: #a0abb6; /* 마우스 올렸을 때 진해지는 색상 */
-        }
+        /* 1. 지출 내역 상자 안쪽에 숨통 트여주기 (오른쪽 여백 12px) */
+        #history-list { padding-right: 12px; }
+
+        /* 2. 스크롤바 여리여리하고 예쁘게 성형 */
+        #history-list::-webkit-scrollbar { width: 6px; /* 8px에서 6px로 더 얇게! */ }
+        #history-list::-webkit-scrollbar-track { background: transparent; /* 촌스러운 회색 배경 날리고 투명하게 */ }
+        #history-list::-webkit-scrollbar-thumb { background: #d1d5db; /* 연하고 부드러운 조약돌 색상 */border-radius: 10px; /* 완전 동글동글하게 */ }
+        #history-list::-webkit-scrollbar-thumb:hover { background: #9ca3af; /* 마우스 올리면 살짝 진해짐 */ }
+
+        /* 3. 촌스러운 체크박스 대신 예쁜 토글 스위치 만들기 */
+        .cute-toggle { display: none; /* 기본 네모 체크박스는 꼴도 보기 싫으니 숨김! */ }
+        .cute-toggle + label { display: inline-block; width: 38px; height: 22px; background: #e5e7eb; border-radius: 22px; position: relative; cursor: pointer; transition: background 0.3s ease; }
+        .cute-toggle + label::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: transform 0.3s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); /* 스위치 알맹이에 살짝 그림자 */ }
+        .cute-toggle:checked + label { background: #4ade80; /* 켜지면 예쁜 파스텔톤 초록색으로 짠! */ }
+        .cute-toggle:checked + label::after { transform: translateX(16px); /* 켜지면 오른쪽으로 스르륵 이동 */ }
 
     </style>
 </head>
@@ -129,8 +129,9 @@
                     
                     <div style="display: flex; align-items: center; width: 65%; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; background: #fff;">
                         
-                        <div style="padding: 6px 10px; background: #f5f5f5; border-right: 1px solid #ccc; display: flex; align-items: center;">
-                            <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()" style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
+                        <div style="padding: 6px 10px; border-right: 1px solid #ccc; display: flex; align-items: center; background: #fafafa;">
+                            <input type="checkbox" id="chk-deduct-installment" class="cute-toggle" onchange="formatAndCalculate()">
+                            <label for="chk-deduct-installment" style="margin: 0;" title="체크 시 지출 내역에 자동 포함"></label>
                         </div>
                         
                         <select id="installment-card" onchange="formatAndCalculate()" style="border: none; padding: 8px; background: transparent; outline: none; font-size: 0.9rem; border-right: 1px solid #eee; cursor: pointer;">
