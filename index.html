@@ -667,7 +667,7 @@
             if(tabName === 'track') updateTrackerUI();
         }
 
-       function updateTrackerUI() {
+        function updateTrackerUI() {
             const targetNh = parseInt(appData.planNh.replace(/,/g, ''), 10) || 0;
             const targetSamsung = parseInt(appData.planSamsung.replace(/,/g, ''), 10) || 0;
 
@@ -681,23 +681,22 @@
             // 에러 방지를 위해 원본 인덱스를 보존하며 복사본 생성
             let displayTransactions = appData.transactions.map((t, idx) => ({ ...t, originalIndex: idx }));
             
-            // ★ 체크박스가 켜져있고 할부금 금액이 있으면 지출 내역 맨 위에 임시 자동 추가
+            // ★ [변경점 1] unshift 대신 push를 사용하여 데이터를 구조적으로 정렬할 준비를 합니다.
             if (appData.deductInstallment) {
                 const instAmount = parseInt((appData.installment || '0').replace(/,/g, ''), 10) || 0;
                 if (instAmount > 0) {
-                    displayTransactions.unshift({
-                        // 화면의 할부금 카드 선택창에서 고른 값을 가져옵니다.
+                    displayTransactions.push({ // <- unshift에서 push로 변경되었습니다.
                         card: document.getElementById('installment-card') ? document.getElementById('installment-card').value : '삼성',
                         category: '할부금',
                         amount: instAmount,
                         memo: '할부금(자동)',
                         date: '이월',
-                        isAuto: true // 취소 버튼 숨기기용 구분값
+                        isAuto: true 
                     });
                 }
             }
 
-            // 2. ★ 3번 코드 삽입: 자동 할부금까지 다 넣은 '다음'에 순서를 싹 정리합니다! (이름도 displayTransactions로 맞춤)
+            // 할부금 정렬 코드
             displayTransactions.sort((a, b) => {
                 if (a.category === '할부금' && b.category !== '할부금') return 1;
                 if (a.category !== '할부금' && b.category === '할부금') return -1;
@@ -711,26 +710,34 @@
                 const item = document.createElement('div');
                 item.className = 'history-item';
                 
-                // 자동으로 추가된 할부금 내역은 '취소' 버튼이 뜨지 않도록 처리
-                const deleteBtnHtml = t.isAuto ? '' : `<button class="delete-btn" onclick="deleteTransaction(${t.originalIndex})">취소</button>`;
+                // ★ [변경점 2] 가로 정렬 뼈대를 위해 item 상자 자체에 flex 스타일을 부여합니다.
+                item.style.display = 'flex';
+                item.style.justifyContent = 'space-between';
+                item.style.alignItems = 'center';
+                item.style.padding = '12px 0';
+                item.style.borderBottom = '1px solid #f0f0f0';
+                
+                // ★ [변경점 3] 취소 버튼을 귀여운 동그라미 X 버튼 스타일로 정의합니다.
+                const deleteBtnHtml = t.isAuto ? '' : `<button onclick="deleteTransaction(${t.originalIndex})" style="width: 20px; height: 20px; border-radius: 50%; background: #ffebee; color: #d32f2f; border: none; font-size: 0.8rem; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1; flex-shrink: 0;">&times;</button>`;
 
+                // ★ [변경점 4] 금액과 X 버튼이 가로로 나란히 붙는 깔끔한 레이아웃 구조를 대입합니다.
                 item.innerHTML = `
-                        <div style="flex: 1; min-width: 0; padding-right: 10px;">
-                            <div style="margin-bottom: 2px;">
-                                <strong style="color: #3f51b5; font-size: 1rem;">${t.category}</strong>
-                                <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; vertical-align: middle;">${t.card}</span>
-                            </div>
-                            <div style="color: #666; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                ${t.memo} <span style="color: #aaa;">(${t.date})</span>
-                            </div>
+                    <div style="flex: 1; min-width: 0; padding-right: 8px;">
+                        <div style="margin-bottom: 2px;">
+                            <strong style="color: #3f51b5; font-size: 1rem;">${t.category}</strong>
+                            <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; vertical-align: middle;">${t.card}</span>
                         </div>
+                        <div style="color: #666; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${t.memo} <span style="color: #aaa;">(${t.date})</span>
+                        </div>
+                    </div>
 
-                        <div style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-                            <strong style="font-size: 1.05rem; color: #333;">${t.amount.toLocaleString()}원</strong>
-                            ${deleteBtnHtml}
-                        </div>
-                    `;
-                    historyList.appendChild(item);
+                    <div style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+                        <strong style="font-size: 1.05rem; color: #333;">${t.amount.toLocaleString()}원</strong>
+                        ${deleteBtnHtml}
+                    </div>
+                `;
+                historyList.appendChild(item);
             });
 
             if(displayTransactions.length === 0) historyList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px 0;">지출 내역이 없습니다.</div>';
