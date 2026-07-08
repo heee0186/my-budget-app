@@ -61,7 +61,24 @@
         .delete-btn { color: #f44336; font-size: 0.9rem; font-weight: bold; cursor: pointer; background: #ffebee; border: none; border-radius: 4px; padding: 5px 10px; margin-left: 10px; }
         
         #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; font-weight: bold; color: #1a237e; }
-        .memo-display-box { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 4px; padding: 4px 8px; /* 위아래 패딩을 4px로 대폭 줄임 */margin-bottom: 6px; font-size: 0.85rem; }    
+        .memo-display-box { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 4px; padding: 4px 8px; /* 위아래 패딩을 4px로 대폭 줄임 */margin-bottom: 6px; font-size: 0.85rem; }
+
+        /* ★ 지출 내역 스크롤바 예쁘게 꾸미기 ★ */
+        #history-list::-webkit-scrollbar {
+            width: 8px; /* 스크롤바 굵기 */
+        }
+        #history-list::-webkit-scrollbar-track {
+            background: #f4f6f8; /* 스크롤바가 다니는 길 색상 */
+            border-radius: 4px;
+        }
+        #history-list::-webkit-scrollbar-thumb {
+            background: #c1c9d2; /* 스크롤바 막대기 색상 */
+            border-radius: 4px;
+        }
+        #history-list::-webkit-scrollbar-thumb:hover {
+            background: #a0abb6; /* 마우스 올렸을 때 진해지는 색상 */
+        }
+
     </style>
 </head>
 <body>
@@ -107,17 +124,21 @@
                 <div class="input-row"><label>📺 구독료</label><input type="text" id="subscribe" value="0" oninput="formatAndCalculate()"></div>
                 <div class="input-row"><label>👨‍👩‍👧‍👦 계/모임비</label><input type="text" id="kye" value="0" oninput="formatAndCalculate()"></div>
                 <div class="input-row"><label>📈 투자금</label><input type="text" id="invest" value="0" oninput="formatAndCalculate()"></div>
-                <div class="input-group" style="display: flex; justify-content: space-between; align-items: center;">
-                    <label style="margin: 0; flex-shrink: 0;">💳 할부금</label>
-                    <div style="display: flex; align-items: center; gap: 8px; width: 60%;">
-                        <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()" title="체크 시 지출 내역에 자동 포함" style="width: 18px; height: 18px; margin: 0; cursor: pointer; flex-shrink: 0;">
+                <div class="input-group" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <label style="margin: 0; flex-shrink: 0; font-weight: bold; color: #333;">💳 할부금</label>
+                    
+                    <div style="display: flex; align-items: center; width: 65%; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; background: #fff;">
                         
-                        <select id="installment-card" onchange="formatAndCalculate()" style="padding: 2px 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem;">
+                        <div style="padding: 6px 10px; background: #f5f5f5; border-right: 1px solid #ccc; display: flex; align-items: center;">
+                            <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()" style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
+                        </div>
+                        
+                        <select id="installment-card" onchange="formatAndCalculate()" style="border: none; padding: 8px; background: transparent; outline: none; font-size: 0.9rem; border-right: 1px solid #eee; cursor: pointer;">
                             <option value="삼성">삼성</option>
                             <option value="NH">NH</option>
                         </select>
                         
-                        <input type="text" id="installment" oninput="formatAndCalculate()" placeholder="0" style="width: 100%; text-align: right; margin: 0;">
+                        <input type="text" id="installment" oninput="formatAndCalculate()" placeholder="0" style="border: none; padding: 8px 10px; width: 100%; text-align: right; outline: none; font-size: 0.9rem; background: transparent;">
                     </div>
                 </div>
             </div>
@@ -695,6 +716,8 @@
 
                 item.innerHTML = `
                     <div><strong style="color: #3f51b5;">${t.category}</strong><br><span style="color: #666; font-size: 0.85rem;">${t.memo} <span style="color: #aaa;">(${t.date})</span></span></div>
+                    <span style="color: #999;">(${t.date})</span> 
+                    <span style="font-size: 0.75rem; color: #888; margin-left: 4px;">[${t.card}]</span>
                     <div style="text-align: right;"><strong style="font-size: 1.05rem;">${t.amount.toLocaleString()}원</strong>
                     ${deleteBtnHtml}</div>
                 `;
@@ -827,22 +850,21 @@
             document.getElementById('memo').value = merchant;
         }
 
-        // 다가오는 카드 청구 대금을 정확한 날짜 기준으로 계산하는 함수
         async function toggleBillCalc() {
             const contentDiv = document.getElementById('bill-calc-content');
             
-            // 창이 열려있으면 닫기
+            // 1. 창이 열려있으면 닫기
             if (contentDiv.style.display === 'block') {
                 contentDiv.style.display = 'none';
                 return;
             }
             
-            // 창 열고 계산 시작
+            // 2. 창 열고 계산 시작 (로딩 문구 먼저 띄우기)
             contentDiv.style.display = 'block';
             document.getElementById('bill-nh').innerText = '계산 중...';
             document.getElementById('bill-samsung').innerText = '계산 중...';
 
-            // 지난달 데이터 ID 찾기
+            // 3. 지난달 데이터 ID 찾기
             let prevMonth = viewMonth === 1 ? 12 : viewMonth - 1;
             let prevYear = viewMonth === 1 ? viewYear - 1 : viewYear;
             let prevId = prevYear * 100 + prevMonth;
@@ -858,20 +880,21 @@
                 console.error("이전 달 데이터 불러오기 실패", err);
             }
 
-            // 지난달 지출 내역 + 이번 달 지출 내역 합치기
+            // 4. 지출 내역 합치고 0원부터 계산 시작!
             const allTx = [...prevTransactions, ...(appData.transactions || [])];
 
             let sumNh = 0;
             let sumSamsung = 0;
 
-            // 합친 내역들을 하나씩 검사하면서 조건에 맞는 것만 더하기
+            // 5. 합친 내역들을 하나씩 검사하면서 조건에 맞는 것만 더하기
             allTx.forEach(t => {
                 if (!t.date || !t.amount) return;
 
+                // 이미 내역에 저장된 할부금이라면 날짜 상관없이 더하기
                 if (t.category === '할부금') {
                     if (t.card === 'NH') sumNh += t.amount;
                     else if (t.card === '삼성') sumSamsung += t.amount;
-                    return; // 할부금 계산이 끝났으니 아래쪽의 날짜 계산 코드는 건너뜁니다.
+                    return; 
                 }
                 
                 let txMonth = -1, txDay = -1;
@@ -902,7 +925,16 @@
                 }
             });
 
-            // 계산된 금액을 화면에 천단위 쉼표 찍어서 표시
+            // 6. ★ 아까 추가하려던 코드! 화면에 떠있는 1번 탭 할부금 강제 합산하기
+            if (appData.deductInstallment) {
+                const instAmount = parseInt((appData.installment || '0').replace(/,/g, ''), 10) || 0;
+                const instCard = document.getElementById('installment-card') ? document.getElementById('installment-card').value : '삼성';
+                
+                if (instCard === 'NH') sumNh += instAmount;
+                else if (instCard === '삼성') sumSamsung += instAmount;
+            }
+
+            // 7. ★ 최종 표시: 계산이 다~ 끝난 진짜 최종 금액을 화면에 천단위 쉼표 찍어서 표시!
             document.getElementById('bill-nh').innerText = sumNh.toLocaleString() + '원';
             document.getElementById('bill-samsung').innerText = sumSamsung.toLocaleString() + '원';
         }
