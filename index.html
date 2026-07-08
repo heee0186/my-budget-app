@@ -65,7 +65,7 @@
 
         /* ★ 지출 내역 스크롤바 예쁘게 꾸미기 ★ */
         #history-list::-webkit-scrollbar {
-            width: 8px; /* 스크롤바 굵기 */
+            width: 4px; /* 스크롤바 굵기 */
         }
         #history-list::-webkit-scrollbar-track {
             background: #f4f6f8; /* 스크롤바가 다니는 길 색상 */
@@ -715,9 +715,12 @@
                 const deleteBtnHtml = t.isAuto ? '' : `<button class="delete-btn" onclick="deleteTransaction(${t.originalIndex})">취소</button>`;
 
                 item.innerHTML = `
-                    <div><strong style="color: #3f51b5;">${t.category}</strong><br><span style="color: #666; font-size: 0.85rem;">${t.memo} <span style="color: #aaa;">(${t.date})</span></span></div>
-                    <span style="color: #999;">(${t.date})</span> 
-                    <span style="font-size: 0.75rem; color: #888; margin-left: 4px;">[${t.card}]</span>
+                    <div><strong style="color: #3f51b5;">${t.category}</strong><br>
+                        <span style="color: #666; font-size: 0.85rem;">${t.memo} 
+                            <span style="color: #aaa;">(${t.date})</span>
+                            <span style="font-size: 0.75rem; color: #aaa; margin-left: 4px;">[${t.card}]</span>
+                        </span>
+                    </div>
                     <div style="text-align: right;"><strong style="font-size: 1.05rem;">${t.amount.toLocaleString()}원</strong>
                     ${deleteBtnHtml}</div>
                 `;
