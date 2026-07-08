@@ -127,19 +127,18 @@
                 <div class="input-group" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <label style="margin: 0; flex-shrink: 0; font-weight: bold; color: #333;">💳 할부금</label>
                     
-                    <div style="display: flex; align-items: center; width: 65%; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; background: #fff;">
+                    <div style="display: flex; align-items: stretch; width: 68%; height: 36px; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; background: #fff;">
                         
-                        <div style="padding: 6px 10px; border-right: 1px solid #ccc; display: flex; align-items: center; background: #fafafa;">
-                            <input type="checkbox" id="chk-deduct-installment" class="cute-toggle" onchange="formatAndCalculate()">
-                            <label for="chk-deduct-installment" style="margin: 0;" title="체크 시 지출 내역에 자동 포함"></label>
+                        <div style="padding: 0 10px; border-right: 1px solid #eee; display: flex; align-items: center; background: #fafafa;">
+                            <input type="checkbox" id="chk-deduct-installment" onchange="formatAndCalculate()" style="width: 16px; height: 16px; margin: 0; cursor: pointer;">
                         </div>
                         
-                        <select id="installment-card" onchange="formatAndCalculate()" style="border: none; padding: 8px; background: transparent; outline: none; font-size: 0.9rem; border-right: 1px solid #eee; cursor: pointer;">
+                        <select id="installment-card" onchange="formatAndCalculate()" style="width: 60px; flex-shrink: 0; border: none; border-right: 1px solid #eee; background: transparent; font-size: 0.85rem; text-align: center; outline: none; cursor: pointer; padding: 0;">
                             <option value="삼성">삼성</option>
                             <option value="NH">NH</option>
                         </select>
                         
-                        <input type="text" id="installment" oninput="formatAndCalculate()" placeholder="0" style="border: none; padding: 8px 10px; width: 100%; text-align: right; outline: none; font-size: 0.9rem; background: transparent;">
+                        <input type="text" id="installment" oninput="formatAndCalculate()" placeholder="0" style="flex-grow: 1; min-width: 0; border: none; padding: 0 10px; text-align: right; outline: none; font-size: 0.95rem; background: transparent;">
                     </div>
                 </div>
             </div>
@@ -719,7 +718,7 @@
                     <div><strong style="color: #3f51b5;">${t.category}</strong><br>
                         <span style="color: #666; font-size: 0.85rem;">${t.memo} 
                             <span style="color: #aaa;">(${t.date})</span>
-                            <span style="font-size: 0.75rem; color: #aaa; margin-left: 4px;">[${t.card}]</span>
+                            <span style="display: inline-block; padding: 2px 5px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-right: 4px; vertical-align: middle;">${t.card}</span>
                         </span>
                     </div>
                     <div style="text-align: right;"><strong style="font-size: 1.05rem;">${t.amount.toLocaleString()}원</strong>
