@@ -254,10 +254,9 @@
             <div id="memo-lock-screen" class="card" style="text-align: center; padding: 40px 20px;">
                 <div style="font-size: 3rem; margin-bottom: 10px;">🔒</div>
                 <h3 style="color: #1a237e; margin-bottom: 20px;">비밀번호 입력</h3>
-                <input type="password" id="memo-pwd-input" placeholder="비밀번호 입력" style="width: 50%; padding: 12px; margin-bottom: 15px; text-align: center; font-size: 1.2rem; letter-spacing: 5px;">
+                <input type="password" id="memo-pwd-input" placeholder="비밀번호 입력" onkeypress="if(event.key === 'Enter') unlockMemo();" style="width: 50%; padding: 12px; margin-bottom: 15px; text-align: center; font-size: 1.2rem; letter-spacing: 5px;">
                 <br>
                 <button onclick="unlockMemo()" class="primary-btn" style="width: 50%;">확인</button>
-                <input type="password" id="memo-pwd-input" placeholder="비밀번호 입력" onkeypress="if(event.key === 'Enter') unlockMemo();">
             </div>
 
             <div id="memo-secret-content" style="display: none;">
