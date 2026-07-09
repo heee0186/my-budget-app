@@ -79,25 +79,54 @@
         .cute-toggle:checked + label { background: #4ade80; /* 켜지면 예쁜 파스텔톤 초록색으로 짠! */ }
         .cute-toggle:checked + label::after { transform: translateX(16px); /* 켜지면 오른쪽으로 스르륵 이동 */ }
 
-        /* 🌙 다크모드가 켜졌을 때 전체 배경과 글자색 */
+        /* 🌙 1. 다크모드 켜졌을 때 전체 배경 */
         body.dark-mode {
-            background-color: #121212;
-            color: #e0e0e0;
+            background-color: #121212 !important;
+            color: #e0e0e0 !important;
         }
 
-        /* 기존에 배경이 하얗게(background: #fff) 고정되어 있던 상자들을 까맣게 덮어씌웁니다 */
-        body.dark-mode .input-group, 
-        body.dark-mode .history-item,
-        body.dark-mode div[style*="background: #fff"], 
+        /* 🌙 2. 하얗게 둥둥 뜬 겉껍데기(컨테이너, 카드) 전부 까맣게 덮기 */
+        body.dark-mode .container,
+        body.dark-mode .card,
+        body.dark-mode div[style*="background: white"],
+        body.dark-mode div[style*="background-color: white"],
+        body.dark-mode div[style*="background: #ffffff"],
+        body.dark-mode div[style*="background: #fff"],
         body.dark-mode div[style*="background: #fafafa"] {
-            background-color: #1e1e1e !important; 
+            background-color: #1e1e1e !important;
             border-color: #333 !important;
             color: #e0e0e0 !important;
         }
 
-        /* 다크모드일 때 파란색 글씨들도 너무 눈부시지 않게 살짝 톤다운 */
+        /* 🌙 3. 청구 대금 확인란 등 약간 회색이었던 상자들도 어둡게 */
+        body.dark-mode div[style*="background: #f9f9f9"],
+        body.dark-mode div[style*="background: #f1f3f5"],
+        body.dark-mode div[style*="background: #f5f5f5"] {
+            background-color: #2c2c2c !important;
+            border-color: #444 !important;
+            color: #e0e0e0 !important;
+        }
+
+        /* 🌙 4. 까만 배경에 묻혀서 안 보이는 회색 글씨(메모, 날짜 등) 밝게 살려내기 */
+        body.dark-mode div[style*="color: #666"],
+        body.dark-mode span[style*="color: #aaa"],
+        body.dark-mode span[style*="color: #999"],
+        body.dark-mode span[style*="color: #888"] {
+            color: #b0b0b0 !important;
+        }
+
+        /* 🌙 5. 너무 눈부신 파란색(카테고리명)과 검은색 글씨들을 부드러운 톤으로 변경 */
         body.dark-mode strong[style*="color: #3f51b5"] {
             color: #8c9eff !important; 
+        }
+        body.dark-mode strong[style*="color: #333"] {
+            color: #f5f5f5 !important;
+        }
+        
+        /* 🌙 6. 카드 뱃지 디자인 어둡게 */
+        body.dark-mode span[style*="background: #e2e8f0"] {
+            background-color: #333 !important;
+            color: #ccc !important;
         }
 
     </style>
@@ -1043,7 +1072,7 @@
                 document.body.classList.add('dark-mode');
             }
         });
-        
+
     </script>
 </body>
 </html>
