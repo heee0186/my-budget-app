@@ -254,18 +254,19 @@
             <div id="memo-lock-screen" class="card" style="text-align: center; padding: 40px 20px;">
                 <div style="font-size: 3rem; margin-bottom: 10px;">🔒</div>
                 <h3 style="color: #1a237e; margin-bottom: 20px;">비밀번호 입력</h3>
-                <input type="password" id="memo-pwd-input" placeholder="비밀번호 4자리" style="width: 50%; padding: 12px; margin-bottom: 15px; text-align: center; font-size: 1.2rem; letter-spacing: 5px;">
+                <input type="password" id="memo-pwd-input" placeholder="비밀번호 입력" style="width: 50%; padding: 12px; margin-bottom: 15px; text-align: center; font-size: 1.2rem; letter-spacing: 5px;">
                 <br>
                 <button onclick="unlockMemo()" class="primary-btn" style="width: 50%;">확인</button>
+                <input type="password" id="memo-pwd-input" placeholder="비밀번호 입력" onkeypress="if(event.key === 'Enter') unlockMemo();">
             </div>
 
             <div id="memo-secret-content" style="display: none;">
                 <div class="card">
                     <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
                         <span>명세서 보관함</span>
-                        <div>
-                            <button onclick="lockMemo()" style="background:#555; color:white; border:none; border-radius:4px; padding:6px 10px; font-size:0.8rem; cursor:pointer; margin-right:5px;">🔒 다시 잠금</button>
-                            <button id="btn-memo-edit" onclick="toggleMemoEdit()" style="background:#3f51b5; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.9rem;">수정하기</button>
+                        <div style="display: flex; gap: 10px; margin-top: 20px;">
+                            <button onclick="lockMemo()" style="flex:1; background:#555; color:white; border:none; border-radius:4px; padding:6px 10px; font-size:0.8rem; cursor:pointer; margin-right:5px;">🔒 다시 잠금</button>
+                            <button id="btn-memo-edit" onclick="toggleMemoEdit()" style="flex:1; background:#3f51b5; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.9rem;">수정하기</button>
                         </div>
                     </div>
                     
