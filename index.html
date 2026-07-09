@@ -464,7 +464,7 @@
             
             const btn = document.getElementById('btn-memo-edit');
             if(btn) {
-                btn.innerText = '수정하기';
+                btn.innerText = '수정';
                 btn.style.background = '#3f51b5';
             }
         }
@@ -497,7 +497,7 @@
 
                 document.getElementById('memo-view-mode').style.display = 'none';
                 document.getElementById('memo-edit-mode').style.display = 'block';
-                btn.innerText = '등록 완료';
+                btn.innerText = '등록';
                 btn.style.background = '#4CAF50';
             } else {
                 const getRows = (selector) => Array.from(document.querySelectorAll(selector)).map(row => ({
