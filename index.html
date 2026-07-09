@@ -264,8 +264,8 @@
                     <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
                         <span>명세서 보관함</span>
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
-                            <button onclick="lockMemo()" style="flex:1; background:#555; color:white; border:none; border-radius:4px; padding:6px 10px; font-size:0.8rem; cursor:pointer; margin-right:5px;">🔒 잠금</button>
-                            <button id="btn-memo-edit" onclick="toggleMemoEdit()" style="flex:1; background:#3f51b5; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.9rem;">수정</button>
+                            <button onclick="lockMemo()" style="flex:1; background:#555; color:white; border:none; border-radius:4px; padding:6px 10px; font-size:0.8rem; cursor:pointer; margin-right:5px; white-space: nowrap; flex-shrink: 0;">🔒 잠금</button>
+                            <button id="btn-memo-edit" onclick="toggleMemoEdit()" style="flex:1; background:#3f51b5; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.9rem; white-space: nowrap; flex-shrink: 0;">수정하기</button>
                         </div>
                     </div>
                     
@@ -464,12 +464,12 @@
             
             const btn = document.getElementById('btn-memo-edit');
             if(btn) {
-                btn.innerText = '수정';
+                btn.innerText = '수정하기';
                 btn.style.background = '#3f51b5';
             }
         }
 
-        // 보기 모드와 수정 모드를 전환하는 엔진
+        // 보기 모드와 수정 모드를 전환하는 
         function toggleMemoEdit() {
             isMemoEditMode = !isMemoEditMode;
             const btn = document.getElementById('btn-memo-edit');
@@ -497,7 +497,7 @@
 
                 document.getElementById('memo-view-mode').style.display = 'none';
                 document.getElementById('memo-edit-mode').style.display = 'block';
-                btn.innerText = '등록';
+                btn.innerText = '등록하기';
                 btn.style.background = '#4CAF50';
             } else {
                 const getRows = (selector) => Array.from(document.querySelectorAll(selector)).map(row => ({
