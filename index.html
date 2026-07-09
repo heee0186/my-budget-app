@@ -139,7 +139,7 @@
     </style>
 </head>
 <body>
-    <div class="header"> 💰가계부</div>
+    <div class="header" onclick="triggerSecretTabs()" style="cursor: pointer; user-select: none;"> 💰가계부</div>
     <button onclick="toggleDarkMode()" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer;" title="다크모드 켜기/끄기">
     🌗
     </button>
@@ -153,9 +153,9 @@
     
     <!-- 상단 탭 -->
     <div class="tab-nav">
-        <div class="tab-btn active" id="btn-plan" onclick="switchTab('plan')">📋 1. 월간 설계</div>
+        <div class="tab-btn active" id="btn-plan" onclick="switchTab('plan')" style="display: none;">📋 1. 월간 설계</div>
         <div class="tab-btn" id="btn-track" onclick="switchTab('track')">💳 2. 지출 내역</div>
-        <div class="tab-btn" id="btn-memo" onclick="switchTab('memo')">📝 3. 상세 내역</div>
+        <div class="tab-btn" id="btn-memo" onclick="switchTab('memo')" style="display: none;">📝 3. 상세 내역</div>
     </div>
 
     <div class="container">
@@ -1116,6 +1116,46 @@
                 document.body.classList.add('dark-mode');
             }
         });
+    
+        // ----------------------------------------
+        // 🕵️‍♂️ 비밀 탭핑 (이스터에그) 로직
+        // ----------------------------------------
+        let headerClickCount = 0;
+        let headerClickTimer = null;
+        let isSecretUnlocked = false; // 현재 숨겨진 탭이 열려있는지 여부
+
+        function triggerSecretTabs() {
+            headerClickCount++;
+            
+            // 클릭할 때마다 타이머를 초기화 (1초 안에 연달아 눌러야 인정!)
+            clearTimeout(headerClickTimer);
+            headerClickTimer = setTimeout(() => {
+                headerClickCount = 0; 
+            }, 1000);
+
+            // 3번 연속 클릭에 성공했다면?
+            if (headerClickCount >= 3) {
+                isSecretUnlocked = !isSecretUnlocked; // 상태 뒤집기 (열기/닫기)
+                
+                const btnPlan = document.getElementById('btn-plan');
+                const btnMemo = document.getElementById('btn-memo');
+
+                if (isSecretUnlocked) {
+                    // 숨겨진 탭 보여주기 (원래의 flex 설정으로 복구)
+                    btnPlan.style.display = '';
+                    btnMemo.style.display = '';
+                } else {
+                    // 다시 숨기기
+                    btnPlan.style.display = 'none';
+                    btnMemo.style.display = 'none';
+                    
+                    // 만약 1번이나 3번 탭을 보고 있었다면, 강제로 2번 탭으로 쫓아내기
+                    switchTab('track');
+                }
+                
+                headerClickCount = 0; // 카운트 초기화
+            }
+        }
 
     </script>
 </body>
