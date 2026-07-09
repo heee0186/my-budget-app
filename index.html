@@ -139,6 +139,18 @@
     </style>
 </head>
 <body>
+    <div id="secret-pwd-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center;">
+        <div class="card" style="width: 80%; max-width: 300px; text-align: center; padding: 30px 20px; margin: 0; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+            <div style="font-size: 2.5rem; margin-bottom: 10px;">🔒</div>
+            <h3 style="margin-top: 0; margin-bottom: 20px; color: #1a237e;">비밀번호 입력</h3>
+            <input type="password" id="global-pwd-input" inputmode="numeric" pattern="[0-9]*" placeholder="비밀번호" onkeypress="if(event.key === 'Enter') checkGlobalPassword();" style="width: 100%; padding: 12px; margin-bottom: 15px; text-align: center; font-size: 1.2rem; letter-spacing: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+
+            <div style="display: flex; gap: 10px;">
+                <button onclick="document.getElementById('secret-pwd-modal').style.display='none';" style="flex: 1; padding: 12px; border: none; border-radius: 6px; background: #eee; cursor: pointer; font-weight: bold; color: #333;">취소</button>
+                <button onclick="checkGlobalPassword()" style="flex: 1; padding: 12px; border: none; border-radius: 6px; background: #3f51b5; color: white; cursor: pointer; font-weight: bold;">확인</button>
+            </div>
+        </div>
+    </div>
     <div class="header" onclick="triggerSecretTabs()" style="cursor: pointer; user-select: none;"> 💰가계부</div>
     <button onclick="toggleDarkMode()" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer;" title="다크모드 켜기/끄기">
     🌗
@@ -153,9 +165,9 @@
     
     <!-- 상단 탭 -->
     <div class="tab-nav">
-        <div class="tab-btn active" id="btn-plan" onclick="switchTab('plan')" style="display: none;">📋 1. 월간 설계</div>
-        <div class="tab-btn" id="btn-track" onclick="switchTab('track')">💳 2. 지출 내역</div>
-        <div class="tab-btn" id="btn-memo" onclick="switchTab('memo')" style="display: none;">📝 3. 상세 내역</div>
+        <div class="tab-btn active" id="btn-plan" onclick="switchTab('plan')" style="display: none;">📋 월간 설계</div>
+        <div class="tab-btn" id="btn-track" onclick="switchTab('track')">💳 지출 내역</div>
+        <div class="tab-btn" id="btn-memo" onclick="switchTab('memo')" style="display: none;">📝 상세 내역</div>
     </div>
 
     <div class="container">
@@ -319,21 +331,11 @@
 
         <!-- ================= TAB 3: 상세 내역 관리 ================= -->
        <div id="tab-memo" class="tab-content">
-            
-            <div id="memo-lock-screen" class="card" style="text-align: center; padding: 40px 20px;">
-                <div style="font-size: 3rem; margin-bottom: 10px;">🔒</div>
-                <h3 style="color: #1a237e; margin-bottom: 20px;">비밀번호 입력</h3>
-                <input type="password" id="memo-pwd-input" placeholder="비밀번호 입력" onkeypress="if(event.key === 'Enter') unlockMemo();" style="width: 50%; padding: 12px; margin-bottom: 15px; text-align: center; font-size: 1.2rem; letter-spacing: 5px;">
-                <br>
-                <button onclick="unlockMemo()" class="primary-btn" style="width: 50%;">확인</button>
-            </div>
-
-            <div id="memo-secret-content" style="display: none;">
+            <div id="memo-secret-content">
                 <div class="card">
                     <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
                         <span>명세서 보관함</span>
                         <div style="display: flex; gap: 10px; margin-top: 20px;">
-                            <button onclick="lockMemo()" style="flex:1; background:#555; color:white; border:none; border-radius:4px; padding:6px 10px; font-size:0.8rem; cursor:pointer; margin-right:5px; white-space: nowrap; flex-shrink: 0;">🔒 잠금</button>
                             <button id="btn-memo-edit" onclick="toggleMemoEdit()" style="flex:1; background:#3f51b5; color:white; border:none; border-radius:4px; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.9rem; white-space: nowrap; flex-shrink: 0;">수정하기</button>
                         </div>
                     </div>
@@ -1073,32 +1075,6 @@
             document.getElementById('bill-lotte').innerText = sumLotte.toLocaleString() + '원';
         }
 
-        // ★ 설정하실 비밀번호를 이곳에 입력하세요 (기본값: 1234)
-        const MEMO_PASSWORD = "1106";
-
-        // 비밀번호 확인 및 잠금 해제
-        function unlockMemo() {
-            const inputVal = document.getElementById('memo-pwd-input').value;
-            if (inputVal === MEMO_PASSWORD) {
-                document.getElementById('memo-lock-screen').style.display = 'none';
-                document.getElementById('memo-secret-content').style.display = 'block';
-                document.getElementById('memo-pwd-input').value = ''; // 입력창 비우기
-            } else {
-                alert('비밀번호가 일치하지 않습니다.');
-            }
-        }
-
-        // 명세서 다시 가리기
-        function lockMemo() {
-            document.getElementById('memo-lock-screen').style.display = 'block';
-            document.getElementById('memo-secret-content').style.display = 'none';
-            
-            // 만약 수정 모드로 켜져있었다면, 보기 모드로 자동 전환(저장) 처리
-            if (isMemoEditMode) {
-                toggleMemoEdit();
-            }
-        }
-
         // 1. 다크모드 스위치 함수
         function toggleDarkMode() {
             // body 태그에 'dark-mode'라는 옷(클래스)을 입혔다 벗겼다 합니다.
@@ -1118,42 +1094,48 @@
         });
     
         // ----------------------------------------
-        // 🕵️‍♂️ 비밀 탭핑 (이스터에그) 로직
+        // 🕵️‍♂️ 비밀 탭핑 (비밀번호 모달 연동) 로직
         // ----------------------------------------
+        const SECRET_PASSWORD = "1106"; // 예전에 쓰시던 비밀번호 그대로 유지!
         let headerClickCount = 0;
         let headerClickTimer = null;
-        let isSecretUnlocked = false; // 현재 숨겨진 탭이 열려있는지 여부
+        let isSecretUnlocked = false; 
 
         function triggerSecretTabs() {
             headerClickCount++;
             
-            // 클릭할 때마다 타이머를 초기화 (1초 안에 연달아 눌러야 인정!)
             clearTimeout(headerClickTimer);
             headerClickTimer = setTimeout(() => {
                 headerClickCount = 0; 
             }, 1000);
 
-            // 3번 연속 클릭에 성공했다면?
             if (headerClickCount >= 3) {
-                isSecretUnlocked = !isSecretUnlocked; // 상태 뒤집기 (열기/닫기)
-                
-                const btnPlan = document.getElementById('btn-plan');
-                const btnMemo = document.getElementById('btn-memo');
-
                 if (isSecretUnlocked) {
-                    // 숨겨진 탭 보여주기 (원래의 flex 설정으로 복구)
-                    btnPlan.style.display = '';
-                    btnMemo.style.display = '';
+                    // 🔓 이미 열려있을 때: 비번 필요 없이 즉시 숨김!
+                    isSecretUnlocked = false;
+                    document.getElementById('btn-plan').style.display = 'none';
+                    document.getElementById('btn-memo').style.display = 'none';
+                    switchTab('track'); // 숨기면서 2번 탭으로 강제 이동
                 } else {
-                    // 다시 숨기기
-                    btnPlan.style.display = 'none';
-                    btnMemo.style.display = 'none';
-                    
-                    // 만약 1번이나 3번 탭을 보고 있었다면, 강제로 2번 탭으로 쫓아내기
-                    switchTab('track');
+                    // 🔒 숨겨져 있을 때: 비밀번호 팝업창 띄우기!
+                    document.getElementById('secret-pwd-modal').style.display = 'flex';
+                    document.getElementById('global-pwd-input').value = ''; // 예전 입력값 초기화
                 }
-                
-                headerClickCount = 0; // 카운트 초기화
+                headerClickCount = 0; // 타수 초기화
+            }
+        }
+
+        // 팝업창에서 '확인'을 누르거나 '엔터'를 쳤을 때 실행되는 함수
+        function checkGlobalPassword() {
+            const inputVal = document.getElementById('global-pwd-input').value;
+            if (inputVal === SECRET_PASSWORD) {
+                // 정답이면 탭 열어주고 팝업창 닫기
+                isSecretUnlocked = true;
+                document.getElementById('btn-plan').style.display = '';
+                document.getElementById('btn-memo').style.display = '';
+                document.getElementById('secret-pwd-modal').style.display = 'none';
+            } else {
+                alert('비밀번호가 일치하지 않습니다.');
             }
         }
 
