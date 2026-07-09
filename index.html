@@ -140,7 +140,7 @@
 </head>
 <body>
     <div class="header"> 💰가계부</div>
-    <button onclick="toggleDarkMode()" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer;" title="다크모드 켜기/끄기">
+    <button onclick="toggleDarkMode()" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer;" title="다크모드 켜기/끄기">
     🌗
     </button>
 
@@ -228,6 +228,7 @@
                 <div class="section-title-1">카드별 예산 배분</div>
                 <div class="input-row"><label>🛒 NH카드 예산</label><input type="text" id="plan-nh" value="0" oninput="formatAndCalculate()"></div>
                 <div class="input-row"><label>✈️ 삼성카드 예산</label><input type="text" id="plan-samsung" value="0" oninput="formatAndCalculate()"></div>
+                <div class="input-row"><label>🛍️ 롯데카드 예산</label><input type="text" id="plan-samsung" value="0" oninput="formatAndCalculate()"></div>
                 <div id="alert-deficit" class="alert-box">⚠️ 한도가 유동가능 현금을 초과했습니다!</div>
                 <div id="alert-surplus" class="success-box">🎉 완벽합니다!<br>(마통 상환 여유액: <span id="surplus-amount">0</span>원)</div>
             </div>
@@ -246,7 +247,11 @@
                 <div class="budget-amount" id="samsung-remain">남은 예산: 0원</div>
                 <div class="progress-bar"><div class="progress-fill" id="samsung-bar" style="width: 0%;"></div></div>
             </div>
-
+            <div class="card">
+                <div class="budget-title"><span>🛍️ 롯데카드</span><span id="display-lotte-plan" style="color: #766ca5;">목표: 0원</span></div>
+                <div class="budget-amount" id="lotte-remain">남은 예산: 0원</div>
+                <div class="progress-bar"><div class="progress-fill" id="lotte-bar" style="width: 0%; background: #766ca5;"></div></div>
+            </div>
             <div class="card">
                 <div class="section-title" style="border: none; margin-bottom: 10px;">지출 기록하기</div>
                 <div class="input-group">
@@ -300,7 +305,11 @@
                             <span style="color: #555;">삼성카드 <span style="font-size:0.8rem;">(전월6일~당월5일)</span>:</span>
                             <strong id="bill-samsung" style="color:#d32f2f; font-size:1.1rem;">계산 중...</strong>
                         </div>
-                        <p style="font-size:0.8rem; color:#888; margin-top:12px; margin-bottom:0; text-align:center;">* 이번 달 18일에 통장에서 빠져나갈 정확한 금액입니다.</p>
+                        <div style="display:flex; justify-content:space-between; margin-top:10px;">
+                            <span style="color: #555;">롯데카드 <span style="font-size:0.8rem;">(전월7일~당월6일)</span>:</span>
+                            <strong id="bill-lotte" style="color:#d32f2f; font-size:1.1rem;">계산 중...</strong>
+                        </div>
+                        <p style="font-size:0.8rem; color:#888; margin-top:12px; margin-bottom:0; text-align:center;">* 이번 달 18일에 통장에서 빠져나갈 금액입니다.</p>
                     </div>
                 </div>
                 <div id="history-list" class="history"></div>
@@ -506,7 +515,7 @@
             if(document.getElementById('chk-deduct-installment')) document.getElementById('chk-deduct-installment').checked = appData.deductInstallment || false;
             document.getElementById('plan-nh').value = appData.planNh || '0';
             document.getElementById('plan-samsung').value = appData.planSamsung || '0';
-            
+            if(document.getElementById('plan-lotte')) document.getElementById('plan-lotte').value = appData.planLotte || '0';
             if(document.getElementById('memo-changes')) document.getElementById('memo-changes').value = appData.memoChanges || '';
 
             // 항목별 리스트 데이터가 없으면 빈 배열로 준비
@@ -659,7 +668,7 @@
         function formatAndCalculate(shouldSync = true) {
             // 체크박스 상태 저장하기
             if(document.getElementById('chk-deduct-installment')) appData.deductInstallment = document.getElementById('chk-deduct-installment').checked;
-            const ids = ['income', 'extra-income', 'savings', 'invest', 'fixed', 'subscribe', 'kye', 'installment', 'plan-nh', 'plan-samsung'];
+            const ids = ['income', 'extra-income', 'savings', 'invest', 'fixed', 'subscribe', 'kye', 'installment', 'plan-nh', 'plan-samsung', 'plan-lotte'];
             ids.forEach(id => {
                 let el = document.getElementById(id);
                 if (el) {
@@ -676,7 +685,7 @@
             if(document.getElementById('sum-income')) document.getElementById('sum-income').innerText = totalIncome.toLocaleString() + '원';
             if(document.getElementById('sum-fixed')) document.getElementById('sum-fixed').innerText = totalOutflow.toLocaleString() + '원';
             
-            const surplus = available - (getNum('plan-nh') + getNum('plan-samsung'));
+            const surplus = available - (getNum('plan-nh') + getNum('plan-samsung') + getNum('plan-lotte'));
 
             if (surplus < 0) {
                 document.getElementById('alert-deficit').style.display = 'block';
@@ -691,7 +700,7 @@
 
             ids.forEach(id => {
                 if(document.getElementById(id)) {
-                    let keyName = id === 'extra-income' ? 'extraIncome' : id === 'plan-nh' ? 'planNh' : id === 'plan-samsung' ? 'planSamsung' : id;
+                    let keyName = id === 'extra-income' ? 'extraIncome' : id === 'plan-nh' ? 'planNh' : id === 'plan-samsung' ? 'planSamsung' : id === 'plan-lotte' ? 'planLotte' : id;
                     appData[keyName] = document.getElementById(id).value;
                 }
             });
@@ -730,11 +739,13 @@
         function updateTrackerUI() {
             const targetNh = parseInt(appData.planNh.replace(/,/g, ''), 10) || 0;
             const targetSamsung = parseInt(appData.planSamsung.replace(/,/g, ''), 10) || 0;
+            const targetLotte = parseInt(appData.planLotte.replace(/,/g, ''), 10) || 0; //
 
             document.getElementById('display-nh-plan').innerText = `목표: ${targetNh.toLocaleString()}원`;
             document.getElementById('display-samsung-plan').innerText = `목표: ${targetSamsung.toLocaleString()}원`;
+            document.getElementById('display-lotte-plan').innerText = `목표: ${targetLotte.toLocaleString()}원`;
 
-            let spentNh = 0, spentSamsung = 0;
+            let spentNh = 0, spentSamsung = 0, spentLotte = 0;
             const historyList = document.getElementById('history-list');
             historyList.innerHTML = '';
 
@@ -787,6 +798,7 @@
             displayTransactions.forEach((t) => {
                 if (t.card === 'NH') spentNh += t.amount;
                 if (t.card === '삼성') spentSamsung += t.amount;
+                if (t.card === '롯데') spentLotte += t.amount;
 
                 const item = document.createElement('div');
                 item.className = 'history-item';
@@ -825,17 +837,22 @@
 
             const remainNh = targetNh - spentNh;
             const remainSamsung = targetSamsung - spentSamsung;
+            const remainLotte = targetLotte - spentLotte;
 
             document.getElementById('nh-remain').innerText = `남은 예산: ${remainNh.toLocaleString()}원`;
             document.getElementById('nh-remain').style.color = remainNh < 0 ? '#f44336' : '#4593a0';
             document.getElementById('samsung-remain').innerText = `남은 예산: ${remainSamsung.toLocaleString()}원`;
             document.getElementById('samsung-remain').style.color = remainSamsung < 0 ? '#f44336' : '#409ecc';
+            document.getElementById('lotte-remain').innerText = `남은 예산: ${remainLotte.toLocaleString()}원`;
+            document.getElementById('lotte-remain').style.color = remainLotte < 0 ? '#f44336' : '#766ca5';
+
 
             // (기존 코드의 pctNh, pctSamsung 계산 부분부터 함수 끝까지 덮어쓰세요)
             
             // 남은 예산 비율 계산 (0% 밑으로는 뚫고 나가지 않게 방어)
             const pctNh = targetNh > 0 ? Math.max(0, 100 - (spentNh / targetNh) * 100) : 0;
             const pctSamsung = targetSamsung > 0 ? Math.max(0, 100 - (spentSamsung / targetSamsung) * 100) : 0;
+            const pctLotte = targetLotte > 0 ? Math.max(0, 100 - (spentLotte / targetLotte) * 100) : 0;
 
             document.getElementById('nh-bar').style.width = pctNh + '%';
             // 예산이 20% 이하로 떨어지면 막대기를 빨간색(danger)으로 변경
@@ -852,7 +869,16 @@
                 document.getElementById('samsung-bar').classList.remove('danger');
             }
             
+            
+            document.getElementById('lotte-bar').style.width = pctLotte + '%';
+            if (pctLotte <= 20) {
+                document.getElementById('lotte-bar').classList.add('danger');
+            } else {
+                    document.getElementById('lotte-bar').classList.remove('danger');
+            }
+
         }
+
 
 
        function addTransaction() {
@@ -982,6 +1008,8 @@
 
             let sumNh = 0;
             let sumSamsung = 0;
+            let sumLotte = 0;
+            
 
             // 5. 합친 내역들을 하나씩 검사하면서 조건에 맞는 것만 더하기
             allTx.forEach(t => {
@@ -991,6 +1019,7 @@
                 if (t.category === '할부금') {
                     if (t.card === 'NH') sumNh += t.amount;
                     else if (t.card === '삼성') sumSamsung += t.amount;
+                    else if (t.card === '롯데') sumLotte += t.amount;
                     return; 
                 }
                 
@@ -1020,6 +1049,12 @@
                         sumSamsung += t.amount;
                     }
                 }
+                // 롯데: 전월 7일 이후 ~ 당월 6일 이전
+                else if (t.card === '롯데') {
+                    if ((txMonth === prevMonth && txDay >= 5) || (txMonth === viewMonth && txDay <= 4)) {
+                        sumLotte += t.amount;
+                    }
+                }
             });
 
             // 6. ★ 아까 추가하려던 코드! 화면에 떠있는 1번 탭 할부금 강제 합산하기
@@ -1029,11 +1064,13 @@
                 
                 if (instCard === 'NH') sumNh += instAmount;
                 else if (instCard === '삼성') sumSamsung += instAmount;
+                else if (instCard === '롯데') sumLotte += instAmount;
             }
 
             // 7. ★ 최종 표시: 계산이 다~ 끝난 진짜 최종 금액을 화면에 천단위 쉼표 찍어서 표시!
             document.getElementById('bill-nh').innerText = sumNh.toLocaleString() + '원';
             document.getElementById('bill-samsung').innerText = sumSamsung.toLocaleString() + '원';
+            document.getElementById('bill-lotte').innerText = sumLotte.toLocaleString() + '원';
         }
 
         // ★ 설정하실 비밀번호를 이곳에 입력하세요 (기본값: 1234)
