@@ -228,7 +228,7 @@
                 <div class="section-title-1">카드별 예산 배분</div>
                 <div class="input-row"><label>🛒 NH카드 예산</label><input type="text" id="plan-nh" value="0" oninput="formatAndCalculate()"></div>
                 <div class="input-row"><label>✈️ 삼성카드 예산</label><input type="text" id="plan-samsung" value="0" oninput="formatAndCalculate()"></div>
-                <div class="input-row"><label>🛍️ 롯데카드 예산</label><input type="text" id="plan-samsung" value="0" oninput="formatAndCalculate()"></div>
+                <div class="input-row"><label>🛍️ 롯데카드 예산</label><input type="text" id="plan-lotte" value="0" oninput="formatAndCalculate()"></div>
                 <div id="alert-deficit" class="alert-box">⚠️ 한도가 유동가능 현금을 초과했습니다!</div>
                 <div id="alert-surplus" class="success-box">🎉 완벽합니다!<br>(마통 상환 여유액: <span id="surplus-amount">0</span>원)</div>
             </div>
@@ -739,7 +739,7 @@
         function updateTrackerUI() {
             const targetNh = parseInt(appData.planNh.replace(/,/g, ''), 10) || 0;
             const targetSamsung = parseInt(appData.planSamsung.replace(/,/g, ''), 10) || 0;
-            const targetLotte = parseInt(appData.planLotte.replace(/,/g, ''), 10) || 0; //
+            const targetLotte = parseInt((appData.planLotte || '0').replace(/,/g, ''), 10) || 0;
 
             document.getElementById('display-nh-plan').innerText = `목표: ${targetNh.toLocaleString()}원`;
             document.getElementById('display-samsung-plan').innerText = `목표: ${targetSamsung.toLocaleString()}원`;
