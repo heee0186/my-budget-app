@@ -801,10 +801,7 @@
                 item.style.padding = '12px 0';
                 item.style.borderBottom = '1px solid #f0f0f0';
                 
-                // ★ [변경점 3] 취소 버튼을 귀여운 동그라미 X 버튼 스타일로 정의합니다.
-                const deleteBtnHtml = t.isAuto ? '' : `<button onclick="deleteTransaction(${t.originalIndex})" style="width: 20px; height: 20px; border-radius: 50%; background: #ffebee; color: #d32f2f; border: none; font-size: 0.8rem; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1; flex-shrink: 0;">&times;</button>`;
-
-                // ★ [변경점 4] ✏️수정 버튼과 ❌삭제 버튼 나란히 세팅
+                // ★ [변경점 3] ✏️수정 버튼과 ❌삭제 버튼 나란히 세팅
                 const editBtnHtml = t.isAuto ? '' : `<button onclick="editTransactionMemo(${t.originalIndex})" style="width: 28px; height: 28px; border-radius: 4px; background: #e3f2fd; color: #1976d2; border: none; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-right: 5px; padding: 0;">✏️</button>`;
                 const deleteBtnHtml = t.isAuto ? '' : `<button onclick="deleteTransaction(${t.originalIndex})" style="width: 28px; height: 28px; border-radius: 4px; background: #ffebee; color: #d32f2f; border: none; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1;">&times;</button>`;
 
