@@ -265,52 +265,30 @@
                 <div class="progress-bar"><div class="progress-fill" id="lotte-bar" style="width: 0%; background: #766ca5;"></div></div>
             </div>
             <div class="card">
-                <div class="section-title" style="border: none; margin-bottom: 10px;">지출 기록하기</div>
+                <div class="section-title" style="border: none; margin-bottom: 10px;">스마트폰 알림 연동</div>
+                
+                <button onclick="fetchAndProcessInbox()" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 20px; font-size: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📩 밀린 카드 결제 내역 한방에 불러오기</button>
+
+                <div style="border-top: 2px dashed #eee; margin-bottom: 15px;"></div>
+                <div style="font-size: 0.9rem; color: #888; margin-bottom: 15px; font-weight: bold;">✍️ 수동 기록 (현금, 계좌이체 등)</div>
+
                 <div class="input-group">
                     <label>결제일</label>
                     <input type="date" id="tx-date">
                 </div>
-                <div class="input-group" style="margin-bottom: 15px; padding: 12px; background: #eff8ff; border-radius: 4px; border: 1px solid #ccc;">
-                    <label>💬 카톡/문자 자동 입력</label>
-                    <textarea id="sms-input" rows="2" placeholder="여기에 결제 문자를 붙여 넣으세요" style="width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; resize: none;" oninput="parseAndFillSms()"></textarea>
-                </div>
+                
                 <div class="input-group">
-                    <label>카테고리</label>
-                    <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                        <div style="flex: 1;">
-                            <select id="tx-card" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
-                                <option value="삼성">삼성카드</option>
-                                <option value="NH">농협카드</option>
-                                <option value="롯데">롯데카드</option>
-                                <option value="현금">현금</option>
-                            </select>
-                        </div>
-                        <div style="flex: 1;">
-                            <select id="tx-category" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
-                                <option value="마트">마트/식재료</option>
-                                <option value="온라인">온라인쇼핑</option>
-                                <option value="배달/외식">배달/외식</option>
-                                <option value="직구">직구</option>
-                                <option value="주유">주유비</option>
-                                <option value="기타">기타</option>
-                            </select>
-                        </div>
-                    </div>
+                    <label>결제 수단</label>
+                    <select id="tx-card" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
+                        <option value="삼성">삼성카드</option>
+                        <option value="NH">농협카드</option>
+                        <option value="롯데">롯데카드</option>
+                        <option value="현금">현금 (계좌이체)</option>
+                    </select>
                 </div>
                 <div class="input-group"><input type="text" id="amount" placeholder="결제 금액 (예: 15,000)" oninput="formatNumberInputOnly(this)"></div>
-                <div class="input-group"><input type="text" id="memo" placeholder="메모(날짜 및 항목 상세 기재)"></div>
-                <button class="primary-btn" onclick="addTransaction()">기록하고 잔액 확인</button>
-            </div>
-            <div class="card">
-                <div class="section-title" style="border: none; margin-bottom: 10px;">지출 기록하기</div>
-                
-                <button onclick="fetchAndProcessInbox()" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 15px; font-size: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📩 결제 내역 한번에 불러오기</button>
-
-                <div class="input-group">
-                    <label>결제일</label>
-                    <input type="date" id="tx-date">
-                </div>
-
+                <div class="input-group"><input type="text" id="memo" placeholder="결제처 및 내역 (예: 다이소, 병원 등)"></div>
+                <button class="primary-btn" onclick="addTransaction()">수동 기록 추가하기</button>
             </div>
             <div class="card">
                 <div class="section-title" style="border: none;">이번 달 지출 내역</div>
@@ -826,23 +804,29 @@
                 // ★ [변경점 3] 취소 버튼을 귀여운 동그라미 X 버튼 스타일로 정의합니다.
                 const deleteBtnHtml = t.isAuto ? '' : `<button onclick="deleteTransaction(${t.originalIndex})" style="width: 20px; height: 20px; border-radius: 50%; background: #ffebee; color: #d32f2f; border: none; font-size: 0.8rem; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1; flex-shrink: 0;">&times;</button>`;
 
-                // ★ [변경점 4] 금액과 X 버튼이 가로로 나란히 붙는 깔끔한 레이아웃 구조를 대입합니다.
+                // ★ [변경점 4] ✏️수정 버튼과 ❌삭제 버튼 나란히 세팅
+                const editBtnHtml = t.isAuto ? '' : `<button onclick="editTransactionMemo(${t.originalIndex})" style="width: 28px; height: 28px; border-radius: 4px; background: #e3f2fd; color: #1976d2; border: none; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; margin-right: 5px; padding: 0;">✏️</button>`;
+                const deleteBtnHtml = t.isAuto ? '' : `<button onclick="deleteTransaction(${t.originalIndex})" style="width: 28px; height: 28px; border-radius: 4px; background: #ffebee; color: #d32f2f; border: none; font-size: 1.2rem; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1;">&times;</button>`;
+
+                // ★ [변경점] 카테고리 대신 '메모(결제처)'가 파란색 메인 타이틀로 승격됩니다!
                 item.innerHTML = `
                     <div style="flex: 1; min-width: 0; padding-right: 8px;">
-                        <div style="margin-bottom: 2px;">
-                            <strong style="color: #3f51b5; font-size: 1rem;">${t.category}</strong>
-                            <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; vertical-align: middle;">${t.card}</span>
+                        <div style="margin-bottom: 4px; display: flex; align-items: center;">
+                            <strong style="color: #3f51b5; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;">${t.memo}</strong>
+                            <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; flex-shrink: 0;">${t.card}</span>
                         </div>
-                        <div style="color: #666; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            ${t.memo} <span style="color: #aaa;">(${t.date})</span>
+                        <div style="color: #888; font-size: 0.85rem;">
+                            결제일: ${t.date}
                         </div>
                     </div>
 
-                    <div style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
-                        <strong style="font-size: 1.05rem; color: #333;">${t.amount.toLocaleString()}원</strong>
+                    <div style="flex-shrink: 0; display: flex; align-items: center;">
+                        <strong style="font-size: 1.05rem; color: #333; margin-right: 10px;">${t.amount.toLocaleString()}원</strong>
+                        ${editBtnHtml}
                         ${deleteBtnHtml}
                     </div>
                 `;
+
                 historyList.appendChild(item);
             });
 
@@ -892,14 +876,27 @@
 
         }
 
+        // ----------------------------------------
+        // ✏️ 지출 내역 메모(상호명) 수정 기능
+        // ----------------------------------------
+        function editTransactionMemo(index) {
+            const currentMemo = appData.transactions[index].memo;
+            // 팝업창을 띄워 새로운 내용 입력받기
+            const newMemo = prompt("결제처(메모)를 수정해 주세요:", currentMemo);
+            
+            // 취소를 누르지 않았고, 빈칸이 아닐 때만 저장!
+            if (newMemo !== null && newMemo.trim() !== "") {
+                appData.transactions[index].memo = newMemo.trim();
+                syncToServer();
+                updateTrackerUI();
+            }
+        }
 
 
-       function addTransaction() {
-            // 분리된 카드와 카테고리에서 각각 값을 가져옵니다.
+      function addTransaction() {
             const card = document.getElementById('tx-card').value;
-            const category = document.getElementById('tx-category').value;
             const amount = parseInt(document.getElementById('amount').value.replace(/,/g, ''), 10);
-            const memo = document.getElementById('memo').value || '-';
+            const memo = document.getElementById('memo').value || '결제처 미상';
             
             const rawDate = document.getElementById('tx-date').value;
             if (!rawDate) { alert('결제일을 선택해주세요.'); return; }
@@ -909,10 +906,11 @@
 
             if (isNaN(amount) || amount <= 0) { alert('정확한 결제 금액을 입력해주세요.'); return; }
 
-            appData.transactions.unshift({ card, category, amount, memo, date: dateStr });
+            // category 값은 하위 호환(과거 데이터 에러 방지)을 위해 빈칸('')으로 넣어둡니다.
+            appData.transactions.unshift({ card: card, category: '', amount: amount, memo: memo, date: dateStr, isAuto: false });
+            
             document.getElementById('amount').value = '';
             document.getElementById('memo').value = '';
-            document.getElementById('sms-input').value = '';
             
             syncToServer();
             updateTrackerUI();
@@ -1153,20 +1151,67 @@
         // ----------------------------------------
         // 📬 수파베이스 우체통 자동 수거 및 처리 로직
         // ----------------------------------------
+        // ----------------------------------------
+        // 🍞 예쁜 토스트 팝업 알림창 기능
+        // ----------------------------------------
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.innerText = message;
+            toast.style.position = 'fixed';
+            toast.style.bottom = '20px'; 
+            toast.style.left = '50%';
+            toast.style.transform = 'translateX(-50%)';
+            toast.style.padding = '12px 24px';
+            toast.style.borderRadius = '30px';
+            toast.style.color = 'white';
+            toast.style.fontWeight = 'bold';
+            toast.style.fontSize = '0.95rem';
+            toast.style.zIndex = '10000';
+            toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+            toast.style.transition = 'all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55)'; // 통통 튀는 애니메이션
+            toast.style.opacity = '0';
+            toast.style.whiteSpace = 'pre-wrap';
+            toast.style.textAlign = 'center';
+            toast.style.pointerEvents = 'none'; // 클릭 방해 안 함
+
+            // 타입별로 배경색 다르게 지정!
+            if (type === 'success') toast.style.background = '#4CAF50'; // 🟢 성공 (초록)
+            else if (type === 'info') toast.style.background = '#607D8B'; // 🔵 데이터 없음 (차분한 파랑)
+            else if (type === 'warning') toast.style.background = '#FF9800'; // 🟠 찌꺼기 삭제 (주황)
+            else if (type === 'error') toast.style.background = '#F44336'; // 🔴 에러 (빨강)
+
+            document.body.appendChild(toast);
+
+            // 화면에 스르륵 나타나기
+            setTimeout(() => {
+                toast.style.opacity = '1';
+                toast.style.bottom = '50px';
+            }, 10);
+
+            // 3초 뒤에 알아서 스르륵 사라지기
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.bottom = '20px';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // ----------------------------------------
+        // 📬 수파베이스 우체통 자동 수거 및 처리 로직 (토스트 알림 적용 버전)
+        // ----------------------------------------
         async function fetchAndProcessInbox() {
-            // 사용자에게 로딩 중임을 알림
             const btn = document.querySelector('button[onclick="fetchAndProcessInbox()"]');
             const originalText = btn.innerText;
             btn.innerText = "⏳ 우체통 확인 중...";
             btn.style.background = "#9e9e9e";
 
             try {
-                // 1. 우체통(sms_inbox)에서 모든 편지 가져오기
                 const { data, error } = await supabaseClient.from('sms_inbox').select('*');
                 if (error) throw error;
 
+                // 🔵 새로운 알림이 아예 없을 때 (차분한 파란색 팝업)
                 if (!data || data.length === 0) {
-                    alert('새로운 결제 알림이 없습니다. (밀린 내역 없음!)');
+                    showToast('📭 새로운 결제 알림이 없습니다.', 'info');
                     btn.innerText = originalText;
                     btn.style.background = "#ff9800";
                     return;
@@ -1175,7 +1220,6 @@
                 let successCount = 0;
                 let processedIds = [];
 
-                // 2. 가져온 알림들을 하나씩 뜯어보기
                 data.forEach(row => {
                     const text = row.message;
                     if (!text) {
@@ -1183,28 +1227,23 @@
                         return;
                     }
 
-                    // 기본값 세팅
                     let card = '현금'; 
                     let amount = 0;
                     let dateStr = `${new Date().getMonth()+1}/${new Date().getDate()}`;
                     let memo = text;
 
-                    // 카드사 분류 (삼성, NH, 롯데)
                     if (text.includes('삼성') || text.toLowerCase().includes('samsung')) card = '삼성';
                     else if (text.includes('농협') || text.toLowerCase().includes('nh')) card = 'NH';
                     else if (text.includes('롯데') || text.toLowerCase().includes('lotte')) card = '롯데';
 
-                    // 금액 추출 (정규식으로 000,000원 형태 찾기)
                     const amtMatch = text.match(/([0-9,]+)\s*원/);
                     if (amtMatch) amount = parseInt(amtMatch[1].replace(/,/g, ''), 10);
 
-                    // 날짜 추출
                     const dateMatch = text.match(/([0-1]?[0-9])[-/\.]([0-3]?[0-9])/);
                     if (dateMatch) {
                         dateStr = `${parseInt(dateMatch[1], 10)}/${parseInt(dateMatch[2], 10)}`;
                     }
 
-                    // 찌꺼기 텍스트(메모) 깔끔하게 청소
                     memo = memo.replace(/[가-힣A-Za-z]+카드/g, ''); 
                     memo = memo.replace(/[가-힣]\*[가-힣]님?/g, ''); 
                     memo = memo.replace(/전자상거래(?:이용)?|일시불|승인|취소|누적|잔액|Web발신|체크/ig, '');
@@ -1213,11 +1252,10 @@
                     memo = memo.replace(/\d{2}:\d{2}(?::\d{2})?/g, ''); 
                     memo = memo.replace(/[\n\r\[\]\(\)]/g, ' ').replace(/\s+/g, ' ').trim();
 
-                    // ★ 핵심: '금액'이 추출된 알림만 진짜 결제 내역으로 인정! (잡다한 카톡 알림 자동차단)
                     if (amount > 0) {
                         appData.transactions.unshift({
                             card: card,
-                            category: '기타', // 자동 등록은 일단 '기타'로 묶어둡니다.
+                            category: '', 
                             amount: amount,
                             memo: memo || '자동 등록 내역',
                             date: dateStr,
@@ -1225,32 +1263,29 @@
                         });
                         successCount++;
                     }
-                    
-                    // 결제 문자든 쓸데없는 카톡이든, 한 번 읽은 건 무조건 삭제 리스트에 넣기
                     processedIds.push(row.id); 
                 });
 
-                // 3. 읽은 편지들은 우체통에서 완전히 삭제 (데이터베이스 정리)
                 if (processedIds.length > 0) {
                     await supabaseClient.from('sms_inbox').delete().in('id', processedIds);
                 }
 
-                // 4. 가계부 데이터 저장 및 화면 갱신
                 syncToServer();
                 updateTrackerUI();
 
-                // 5. 완료 알림
+                // 🟢 결제 내역이 성공적으로 들어왔을 때 (기분 좋은 초록색 팝업)
                 if (successCount > 0) {
-                    alert(`🎉 ${successCount}건의 밀린 결제 내역이 자동으로 등록되었습니다!\n(카테고리는 '기타'로 지정되어 있으니 필요시 수정해 주세요)`);
+                    showToast(`🎉 ${successCount}건의 밀린 결제가 자동 등록되었습니다!`, 'success');
                 } else {
-                    alert('결제 금액이 포함된 알림이 없어 등록되지 않았습니다. (쓸데없는 알림은 자동으로 비웠습니다)');
+                // 🟠 결제 문자는 아니고 이상한 카톡만 있어서 지워버렸을 때 (주의 주황색 팝업)
+                    showToast('🗑️ 결제 내역이 아닌 알림을 비웠습니다.', 'warning');
                 }
 
             } catch (error) {
                 console.error('우체통 에러:', error);
-                alert('우체통을 확인하는 중 문제가 발생했습니다.');
+                // 🔴 에러가 났을 때 (경고 빨간색 팝업)
+                showToast('⚠️ 우체통 확인 중 에러가 발생했습니다.', 'error');
             } finally {
-                // 버튼 원래대로 복구
                 btn.innerText = "📩 스마트폰 밀린 결제 내역 한방에 불러오기";
                 btn.style.background = "#ff9800";
             }
