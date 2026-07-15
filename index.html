@@ -136,6 +136,29 @@
             border-color: #444 !important; 
         }
 
+        /* 🎨 드롭다운(셀렉트 박스) 예쁘게 성형하기 */
+        .input-group select {
+            appearance: none;
+            -webkit-appearance: none;
+            background-color: #fff;
+            /* 예쁜 꺾쇠 화살표 아이콘을 배경 이미지로 삽입 */
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 15px center; /* 화살표를 오른쪽에서 15px 띄움 */
+            background-size: 16px;
+            padding-right: 40px; /* 글씨가 화살표를 침범하지 않게 여백 주기 */
+            cursor: pointer;
+        }
+        
+        /* 박스를 클릭(포커스)했을 때 예쁜 파란색 테두리 효과 */
+        .input-group select:focus,
+        .input-group input:focus {
+            outline: none;
+            border-color: #3f51b5;
+            box-shadow: 0 0 0 2px rgba(63, 81, 181, 0.15);
+            transition: all 0.2s;
+        }
+
     </style>
 </head>
 <body>
@@ -265,21 +288,21 @@
                 <div class="progress-bar"><div class="progress-fill" id="lotte-bar" style="width: 0%; background: #766ca5;"></div></div>
             </div>
             <div class="card">
-                <div class="section-title" style="border: none; margin-bottom: 10px;">스마트폰 알림 연동</div>
+                <div class="section-title" style="border: none; margin-bottom: 10px;">알림 내역 불러오기</div>
                 
                 <button onclick="fetchAndProcessInbox()" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 20px; font-size: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📩 밀린 카드 결제 내역 한방에 불러오기</button>
 
                 <div style="border-top: 2px dashed #eee; margin-bottom: 15px;"></div>
-                <div style="font-size: 0.9rem; color: #888; margin-bottom: 15px; font-weight: bold;">✍️ 수동 기록 (현금, 계좌이체 등)</div>
-
+                <div style="font-size: 1.05rem; color: #333; margin-bottom: 15px; font-weight: bold; background: #f8f9fa; padding: 8px 12px; border-radius: 6px; display: inline-block;">✍️ 수동 기록 (현금, 계좌이체 등)</div>
+                
                 <div class="input-group">
-                    <label>결제일</label>
+                    <label style="color: #666; font-weight: bold;">결제일</label>
                     <input type="date" id="tx-date">
                 </div>
                 
                 <div class="input-group">
-                    <label>결제 수단</label>
-                    <select id="tx-card" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:0.9rem;">
+                    <label style="color: #666; font-weight: bold;">결제 수단</label>
+                    <select id="tx-card">
                         <option value="삼성">삼성카드</option>
                         <option value="NH">농협카드</option>
                         <option value="롯데">롯데카드</option>
@@ -813,7 +836,7 @@
                             <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; flex-shrink: 0;">${t.card}</span>
                         </div>
                         <div style="color: #888; font-size: 0.85rem;">
-                            결제일: ${t.date}
+                            (${t.date})
                         </div>
                     </div>
 
