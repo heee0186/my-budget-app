@@ -327,8 +327,19 @@
                 <div id="history-list" class="history"></div>
                 <button class="reset-btn" onclick="clearTransactions()">지출 내역 전체 초기화</button>
             </div>
-        </div>
 
+            <div class="card">
+                <div class="section-title" style="border: none; margin-bottom: 10px;">지출 기록하기</div>
+                
+                <button onclick="fetchAndProcessInbox()" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 15px; font-size: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📩 스마트폰 밀린 결제 내역 한방에 불러오기</button>
+
+                <div class="input-group">
+                    <label>결제일</label>
+                    <input type="date" id="tx-date">
+                </div>
+
+            </div>
+        </div>
         <!-- ================= TAB 3: 상세 내역 관리 ================= -->
        <div id="tab-memo" class="tab-content">
             <div id="memo-secret-content">
@@ -1139,6 +1150,122 @@
             }
         }
 
+        // ----------------------------------------
+        // 📬 수파베이스 우체통 자동 수거 및 처리 로직
+        // ----------------------------------------
+        async function fetchAndProcessInbox() {
+            // 사용자에게 로딩 중임을 알림
+            const btn = document.querySelector('button[onclick="fetchAndProcessInbox()"]');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ 우체통 확인 중...";
+            btn.style.background = "#9e9e9e";
+
+            try {
+                // 1. 우체통(sms_inbox)에서 모든 편지 가져오기
+                const { data, error } = await supabaseClient.from('sms_inbox').select('*');
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    alert('새로운 결제 알림이 없습니다. (밀린 내역 없음!)');
+                    btn.innerText = originalText;
+                    btn.style.background = "#ff9800";
+                    return;
+                }
+
+                let successCount = 0;
+                let processedIds = [];
+
+                // 2. 가져온 알림들을 하나씩 뜯어보기
+                data.forEach(row => {
+                    const text = row.message;
+                    if (!text) {
+                        processedIds.push(row.id);
+                        return;
+                    }
+
+                    // 기본값 세팅
+                    let card = '현금'; 
+                    let amount = 0;
+                    let dateStr = `${new Date().getMonth()+1}/${new Date().getDate()}`;
+                    let memo = text;
+
+                    // 카드사 분류 (삼성, NH, 롯데)
+                    if (text.includes('삼성') || text.toLowerCase().includes('samsung')) card = '삼성';
+                    else if (text.includes('농협') || text.toLowerCase().includes('nh')) card = 'NH';
+                    else if (text.includes('롯데') || text.toLowerCase().includes('lotte')) card = '롯데';
+
+                    // 금액 추출 (정규식으로 000,000원 형태 찾기)
+                    const amtMatch = text.match(/([0-9,]+)\s*원/);
+                    if (amtMatch) amount = parseInt(amtMatch[1].replace(/,/g, ''), 10);
+
+                    // 날짜 추출
+                    const dateMatch = text.match(/([0-1]?[0-9])[-/\.]([0-3]?[0-9])/);
+                    if (dateMatch) {
+                        dateStr = `${parseInt(dateMatch[1], 10)}/${parseInt(dateMatch[2], 10)}`;
+                    }
+
+                    // 찌꺼기 텍스트(메모) 깔끔하게 청소
+                    memo = memo.replace(/[가-힣A-Za-z]+카드/g, ''); 
+                    memo = memo.replace(/[가-힣]\*[가-힣]님?/g, ''); 
+                    memo = memo.replace(/전자상거래(?:이용)?|일시불|승인|취소|누적|잔액|Web발신|체크/ig, '');
+                    memo = memo.replace(/[0-9,]+\s*원/g, ''); 
+                    memo = memo.replace(/\d{1,2}[-/\.]\d{1,2}/g, ''); 
+                    memo = memo.replace(/\d{2}:\d{2}(?::\d{2})?/g, ''); 
+                    memo = memo.replace(/[\n\r\[\]\(\)]/g, ' ').replace(/\s+/g, ' ').trim();
+
+                    // ★ 핵심: '금액'이 추출된 알림만 진짜 결제 내역으로 인정! (잡다한 카톡 알림 자동차단)
+                    if (amount > 0) {
+                        appData.transactions.unshift({
+                            card: card,
+                            category: '기타', // 자동 등록은 일단 '기타'로 묶어둡니다.
+                            amount: amount,
+                            memo: memo || '자동 등록 내역',
+                            date: dateStr,
+                            isAuto: false 
+                        });
+                        successCount++;
+                    }
+                    
+                    // 결제 문자든 쓸데없는 카톡이든, 한 번 읽은 건 무조건 삭제 리스트에 넣기
+                    processedIds.push(row.id); 
+                });
+
+                // 3. 읽은 편지들은 우체통에서 완전히 삭제 (데이터베이스 정리)
+                if (processedIds.length > 0) {
+                    await supabaseClient.from('sms_inbox').delete().in('id', processedIds);
+                }
+
+                // 4. 가계부 데이터 저장 및 화면 갱신
+                syncToServer();
+                updateTrackerUI();
+
+                // 5. 완료 알림
+                if (successCount > 0) {
+                    alert(`🎉 ${successCount}건의 밀린 결제 내역이 자동으로 등록되었습니다!\n(카테고리는 '기타'로 지정되어 있으니 필요시 수정해 주세요)`);
+                } else {
+                    alert('결제 금액이 포함된 알림이 없어 등록되지 않았습니다. (쓸데없는 알림은 자동으로 비웠습니다)');
+                }
+
+            } catch (error) {
+                console.error('우체통 에러:', error);
+                alert('우체통을 확인하는 중 문제가 발생했습니다.');
+            } finally {
+                // 버튼 원래대로 복구
+                btn.innerText = "📩 스마트폰 밀린 결제 내역 한방에 불러오기";
+                btn.style.background = "#ff9800";
+            }
+        }
+
+        {
+  "component": "LlmGeneratedComponent",
+  "props": {
+    "height": "700px",
+    "prompt": "가계부 자동화 시스템의 데이터 흐름을 시각적으로 탐색하고 시뮬레이션할 수 있는 시스템 플로우 시뮬레이터 위젯을 제작해 주세요. 모든 UI 텍스트와 레이블은 한국어로 작성해야 합니다. 화면은 크게 세 영역으로 나뉩니다. 첫째는 '스마트폰(결제 및 알림 발생)', 둘째는 '수파베이스 임시 우체통(sms_inbox)', 셋째는 '가계부 웹 앱(지출 내역)'입니다. 사용자가 직접 단계를 밟아볼 수 있도록 조작 컨트롤을 제공해 주세요. 사용자가 '1단계: 카드 결제 발생(알림 생성)' 버튼을 누르면 스마트폰 영역에 결제 알림이 뜨고, 매크로드로이드가 이를 감지하여 수파베이스 영역으로 HTTP 요청을 보내는 애니메이션 효과를 보여주세요. 수파베이스 영역에는 임시 데이터 행이 추가되는 모습이 시각적으로 표시되어야 합니다. 여러 번 눌러 데이터를 쌓을 수도 있게 해주세요. 이어서 사용자가 가계부 영역의 '2단계: 밀린 내역 불러오기 버튼 클릭'을 수행하면, 수파베이스 임시 영역에 있던 데이터들이 가계부 영역의 '지출 내역 리스트'로 이동하면서 금액 패턴을 분석해 카드를 분류하는 과정을 보여주고, 동시에 수파베이스 임시 영역의 데이터는 완전히 비워지는 시각적 연출을 구현해 주세요. 각 단계의 상태 변화를 직관적으로 이해할 수 있도록 컴포넌트 간 데이터 이동 경로를 화살표나 흐름선으로 표현하고, 활성화된 단계를 시각적으로 강조해 주세요. 구체적인 색상 코드나 폰트 스타일, 좌우 분할 레이아웃 디자인은 생략하고 기능적 역할과 흐름 제어 중심으로 사양을 설계해 주세요."
+  }
+}
+
+
+        
     </script>
 </body>
 </html>
