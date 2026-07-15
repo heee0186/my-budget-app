@@ -301,7 +301,17 @@
                 <div class="input-group"><input type="text" id="memo" placeholder="메모(날짜 및 항목 상세 기재)"></div>
                 <button class="primary-btn" onclick="addTransaction()">기록하고 잔액 확인</button>
             </div>
+            <div class="card">
+                <div class="section-title" style="border: none; margin-bottom: 10px;">지출 기록하기</div>
+                
+                <button onclick="fetchAndProcessInbox()" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 15px; font-size: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📩 결제 내역 한번에 불러오기</button>
 
+                <div class="input-group">
+                    <label>결제일</label>
+                    <input type="date" id="tx-date">
+                </div>
+
+            </div>
             <div class="card">
                 <div class="section-title" style="border: none;">이번 달 지출 내역</div>
                 <div style="margin-top: 20px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 4px; overflow: hidden;">
@@ -328,17 +338,7 @@
                 <button class="reset-btn" onclick="clearTransactions()">지출 내역 전체 초기화</button>
             </div>
 
-            <div class="card">
-                <div class="section-title" style="border: none; margin-bottom: 10px;">지출 기록하기</div>
-                
-                <button onclick="fetchAndProcessInbox()" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 15px; font-size: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📩 스마트폰 밀린 결제 내역 한방에 불러오기</button>
-
-                <div class="input-group">
-                    <label>결제일</label>
-                    <input type="date" id="tx-date">
-                </div>
-
-            </div>
+            
         </div>
         <!-- ================= TAB 3: 상세 내역 관리 ================= -->
        <div id="tab-memo" class="tab-content">
