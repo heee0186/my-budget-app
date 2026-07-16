@@ -309,8 +309,8 @@
                         <option value="현금">현금 (계좌이체)</option>
                     </select>
                 </div>
-                <div class="input-group"><input type="text" id="amount" placeholder="결제 금액 (예: 15,000)" oninput="formatNumberInputOnly(this)"></div>
-                <div class="input-group"><input type="text" id="memo" placeholder="결제처 및 내역 (예: 다이소, 병원 등)"></div>
+                <div class="input-group"><input type="text" id="amount" placeholder="결제 금액" oninput="formatNumberInputOnly(this)"></div>
+                <div class="input-group"><input type="text" id="memo" placeholder="결제처 및 내역"></div>
                 <button class="primary-btn" onclick="addTransaction()">수동 기록 추가하기</button>
             </div>
             <div class="card">
@@ -1217,7 +1217,7 @@
         }
 
         // ----------------------------------------
-        // 📬 수파베이스 우체통 자동 수거 및 처리 로직 (토스트 알림 적용 버전)
+        // 📬 수파베이스 우체통 자동 수거 및 처리 로직 (₩ 인식 업그레이드)
         // ----------------------------------------
         async function fetchAndProcessInbox() {
             const btn = document.querySelector('button[onclick="fetchAndProcessInbox()"]');
@@ -1229,7 +1229,7 @@
                 const { data, error } = await supabaseClient.from('sms_inbox').select('*');
                 if (error) throw error;
 
-                // 🔵 새로운 알림이 아예 없을 때 (차분한 파란색 팝업)
+                // 🔵 새로운 알림이 아예 없을 때
                 if (!data || data.length === 0) {
                     showToast('📭 새로운 결제 알림이 없습니다.', 'info');
                     btn.innerText = originalText;
@@ -1256,20 +1256,26 @@
                     else if (text.includes('농협') || text.toLowerCase().includes('nh')) card = 'NH';
                     else if (text.includes('롯데') || text.toLowerCase().includes('lotte')) card = '롯데';
 
-                    const amtMatch = text.match(/([0-9,]+)\s*원/);
-                    if (amtMatch) amount = parseInt(amtMatch[1].replace(/,/g, ''), 10);
+                    // 💡 금액 추출 (₩4,200 또는 4,200원 모두 완벽 인식!)
+                    const amtMatch = text.match(/₩\s*([0-9,]+)|([0-9,]+)\s*원/);
+                    if (amtMatch) {
+                        amount = parseInt((amtMatch[1] || amtMatch[2]).replace(/,/g, ''), 10);
+                    }
 
                     const dateMatch = text.match(/([0-1]?[0-9])[-/\.]([0-3]?[0-9])/);
                     if (dateMatch) {
                         dateStr = `${parseInt(dateMatch[1], 10)}/${parseInt(dateMatch[2], 10)}`;
                     }
 
+                    // 찌꺼기 텍스트(메모) 깔끔하게 청소
                     memo = memo.replace(/[가-힣A-Za-z]+카드/g, ''); 
                     memo = memo.replace(/[가-힣]\*[가-힣]님?/g, ''); 
                     memo = memo.replace(/전자상거래(?:이용)?|일시불|승인|취소|누적|잔액|Web발신|체크/ig, '');
                     memo = memo.replace(/[0-9,]+\s*원/g, ''); 
+                    memo = memo.replace(/₩\s*[0-9,]+/g, ''); // ₩ 금액 청소
                     memo = memo.replace(/\d{1,2}[-/\.]\d{1,2}/g, ''); 
-                    memo = memo.replace(/\d{2}:\d{2}(?::\d{2})?/g, ''); 
+                    memo = memo.replace(/\d{2}:\d{2}(?::\d{2})?/g, '');
+                    memo = memo.replace(/결제 완료/g, ''); 
                     memo = memo.replace(/[\n\r\[\]\(\)]/g, ' ').replace(/\s+/g, ' ').trim();
 
                     if (amount > 0) {
@@ -1293,20 +1299,17 @@
                 syncToServer();
                 updateTrackerUI();
 
-                // 🟢 결제 내역이 성공적으로 들어왔을 때 (기분 좋은 초록색 팝업)
                 if (successCount > 0) {
                     showToast(`🎉 ${successCount}건의 밀린 결제가 자동 등록되었습니다!`, 'success');
                 } else {
-                // 🟠 결제 문자는 아니고 이상한 카톡만 있어서 지워버렸을 때 (주의 주황색 팝업)
                     showToast('🗑️ 결제 내역이 아닌 알림을 비웠습니다.', 'warning');
                 }
 
             } catch (error) {
                 console.error('우체통 에러:', error);
-                // 🔴 에러가 났을 때 (경고 빨간색 팝업)
                 showToast('⚠️ 우체통 확인 중 에러가 발생했습니다.', 'error');
             } finally {
-                btn.innerText = "📩 스마트폰 밀린 결제 내역 한방에 불러오기";
+                btn.innerText = "📩 밀린 카드 결제 내역 한방에 불러오기";
                 btn.style.background = "#ff9800";
             }
         }
