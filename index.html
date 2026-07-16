@@ -1216,8 +1216,8 @@
             }, 3000);
         }
 
-        // ----------------------------------------
-        // 📬 수파베이스 우체통 자동 수거 및 처리 로직 (₩ 인식 업그레이드)
+       // ----------------------------------------
+        // 📬 수파베이스 우체통 자동 수거 및 처리 로직 (완벽 필터링 버전)
         // ----------------------------------------
         async function fetchAndProcessInbox() {
             const btn = document.querySelector('button[onclick="fetchAndProcessInbox()"]');
@@ -1229,7 +1229,6 @@
                 const { data, error } = await supabaseClient.from('sms_inbox').select('*');
                 if (error) throw error;
 
-                // 🔵 새로운 알림이 아예 없을 때
                 if (!data || data.length === 0) {
                     showToast('📭 새로운 결제 알림이 없습니다.', 'info');
                     btn.innerText = originalText;
@@ -1256,7 +1255,7 @@
                     else if (text.includes('농협') || text.toLowerCase().includes('nh')) card = 'NH';
                     else if (text.includes('롯데') || text.toLowerCase().includes('lotte')) card = '롯데';
 
-                    // 💡 금액 추출 (₩4,200 또는 4,200원 모두 완벽 인식!)
+                    // ₩ 기호와 원 기호 모두 완벽 인식!
                     const amtMatch = text.match(/₩\s*([0-9,]+)|([0-9,]+)\s*원/);
                     if (amtMatch) {
                         amount = parseInt((amtMatch[1] || amtMatch[2]).replace(/,/g, ''), 10);
@@ -1267,15 +1266,15 @@
                         dateStr = `${parseInt(dateMatch[1], 10)}/${parseInt(dateMatch[2], 10)}`;
                     }
 
-                    // 찌꺼기 텍스트(메모) 깔끔하게 청소
+                    // 💡 [핵심] 더 강력해진 찌꺼기 청소기
                     memo = memo.replace(/[가-힣A-Za-z]+카드/g, ''); 
                     memo = memo.replace(/[가-힣]\*[가-힣]님?/g, ''); 
-                    memo = memo.replace(/전자상거래(?:이용)?|일시불|승인|취소|누적|잔액|Web발신|체크/ig, '');
+                    memo = memo.replace(/\d\*\d\*/g, ''); // NH페이의 1*4* 같은 번호 제거
+                    memo = memo.replace(/전자상거래(?:이용)?|일시불|승인|취소|누적|잔액|Web발신|체크|결제 완료/ig, '');
                     memo = memo.replace(/[0-9,]+\s*원/g, ''); 
-                    memo = memo.replace(/₩\s*[0-9,]+/g, ''); // ₩ 금액 청소
+                    memo = memo.replace(/₩\s*[0-9,]+/g, ''); 
                     memo = memo.replace(/\d{1,2}[-/\.]\d{1,2}/g, ''); 
-                    memo = memo.replace(/\d{2}:\d{2}(?::\d{2})?/g, '');
-                    memo = memo.replace(/결제 완료/g, ''); 
+                    memo = memo.replace(/\d{2}:\d{2}(?::\d{2})?/g, ''); 
                     memo = memo.replace(/[\n\r\[\]\(\)]/g, ' ').replace(/\s+/g, ' ').trim();
 
                     if (amount > 0) {
@@ -1300,7 +1299,7 @@
                 updateTrackerUI();
 
                 if (successCount > 0) {
-                    showToast(`🎉 ${successCount}건의 밀린 결제가 자동 등록되었습니다!`, 'success');
+                    showToast(`🎉 ${successCount}건의 결제가 자동 등록되었습니다!`, 'success');
                 } else {
                     showToast('🗑️ 결제 내역이 아닌 알림을 비웠습니다.', 'warning');
                 }
