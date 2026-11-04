@@ -421,9 +421,29 @@
         let forceEditMode = false;
         let isMemoEditMode = false;
 
+        // 서버에서 이 달 자료를 정상적으로 불러왔을 때만 저장을 허용합니다.
+        // (불러오기 실패 상태에서 저장하면 0으로 된 기본값이 실제 자료를 덮어씁니다)
+        let loadOk = false;
+        let loadSeq = 0;
+
         function getViewId() { return viewYear * 100 + viewMonth; }
 
-        function changeMonth(delta) {
+        function escHtml(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function localTodayIso() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        async function changeMonth(delta) {
+            // 1초 대기 중인 자동저장이 있으면 달을 넘기기 전에 지금 달에 먼저 저장
+            if (syncTimer) {
+                clearTimeout(syncTimer);
+                syncTimer = null;
+                await syncToServer();
+            }
             viewMonth += delta;
             if (viewMonth < 1) { viewMonth = 12; viewYear--; }
             if (viewMonth > 12) { viewMonth = 1; viewYear++; }
@@ -441,10 +461,13 @@
             };
 
             document.getElementById('month-display').innerText = "데이터 로딩 중...";
+            const seq = ++loadSeq;
+            loadOk = false;
 
             try {
                 const { data, error } = await supabaseClient.from('my_budget_table').select('content').eq('id', getViewId());
-                if (error && error.code !== 'PGRST116') throw error; 
+                if (seq !== loadSeq) return; // 그새 다른 달로 넘어감
+                if (error && error.code !== 'PGRST116') throw error;
                 
                 let isNewMonth = true; // 빈 데이터({})가 있을 때를 대비한 꼼수
 
@@ -461,14 +484,19 @@
                     let prevId = prevYear * 100 + prevMonth;
                     
                     const { data: prevData } = await supabaseClient.from('my_budget_table').select('content').eq('id', prevId);
+                    if (seq !== loadSeq) return;
                     if (prevData && prevData.length > 0 && prevData[0].content) {
                         appData.memoFixedList = prevData[0].content.memoFixedList || [];
                         appData.memoSubscribeList = prevData[0].content.memoSubscribeList || [];
                         appData.memoInstallmentList = prevData[0].content.memoInstallmentList || [];
                     }
                 }
+                if (!Array.isArray(appData.transactions)) appData.transactions = [];
+                loadOk = true;
             } catch (err) {
+                if (seq !== loadSeq) return;
                 console.error("불러오기 실패", err);
+                showToast('⚠️ 이 달 자료를 불러오지 못했어요.\n새로고침 전까지는 저장하지 않아요.', 'error');
             }
 
             applyDataToUI();
@@ -476,7 +504,8 @@
         }
 
         window.onload = function () {
-            document.getElementById('tx-date').valueAsDate = new Date();
+            // valueAsDate는 UTC 기준이라 한국 시간 오전 9시 전엔 어제 날짜가 들어감
+            document.getElementById('tx-date').value = localTodayIso();
             restoreAutoImportStatus();
             loadMonthData();
             switchTab('track');
@@ -523,10 +552,21 @@
             const isPast = (viewYear < realYear) || (viewYear === realYear && viewMonth < realMonth);
             
             // 과거인데 강제수정 모드도 아니라면 저장(서버통신) 차단
-            if (isPast && !forceEditMode) return;
+            if (isPast && !forceEditMode) return true;
+
+            if (!loadOk) {
+                showToast('⚠️ 자료를 불러오지 못한 상태라 저장하지 않았어요.\n새로고침해 주세요.', 'error');
+                return false;
+            }
 
             // upsert: 데이터가 없으면 새로 만들고, 있으면 덮어씌움 (월별 관리 핵심 기술)
-            await supabaseClient.from('my_budget_table').upsert({ id: getViewId(), content: appData });
+            const { error } = await supabaseClient.from('my_budget_table').upsert({ id: getViewId(), content: appData });
+            if (error) {
+                console.error('저장 실패', error);
+                showToast('⚠️ 저장에 실패했어요. 인터넷 연결을 확인해 주세요.', 'error');
+                return false;
+            }
+            return true;
         }
 
        function applyDataToUI() {
@@ -638,7 +678,7 @@
                     return `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #eee; padding:2px 0; font-size:0.85rem;">
                         <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                            ${item.name || '-'} ${dateSuffix && item.date ? `<span style="color:#888; font-size:0.75rem; margin-left:4px;">(${item.date}${dateSuffix})</span>` : ''}
+                            ${escHtml(item.name || '-')} ${dateSuffix && item.date ? `<span style="color:#888; font-size:0.75rem; margin-left:4px;">(${escHtml(item.date)}${dateSuffix})</span>` : ''}
                         </span>
                         <span style="color: ${isNeg ? '#d32f2f' : '#3f51b5'}; font-weight:bold; flex-shrink:0; margin-left:10px;">${formattedAmt}</span>
                     </div>
@@ -682,12 +722,12 @@
             if(type !== 'income') {
                 // 타입이 installment 이면 남은회차, 그 외는 일
                 let placeholderText = (type === 'installment') ? '남은회차' : '일';
-                dateInput = `<input type="text" class="i-date" placeholder="${placeholderText}" value="${data.date || ''}" style="width:15%; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">`;
+                dateInput = `<input type="text" class="i-date" placeholder="${placeholderText}" value="${escHtml(data.date || '')}" style="width:15%; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">`;
             }
 
             div.innerHTML = `
-                <input type="text" class="i-name" placeholder="항목" value="${data.name || ''}" style="width:${type === 'income' ? '60%' : '45%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">
-                <input type="text" class="i-amt" placeholder="금액" value="${data.amt || ''}" oninput="formatNumberInputOnly(this)" style="width:${type === 'income' ? '30%' : '30%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem; text-align:right;">
+                <input type="text" class="i-name" placeholder="항목" value="${escHtml(data.name || '')}" style="width:${type === 'income' ? '60%' : '45%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">
+                <input type="text" class="i-amt" placeholder="금액" value="${escHtml(data.amt || '')}" oninput="formatNumberInputOnly(this)" style="width:${type === 'income' ? '30%' : '30%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem; text-align:right;">
                 ${dateInput}
                 <button onclick="this.parentElement.remove()" style="width:10%; background:#f44336; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; padding:2px;">X</button>
             `;
@@ -738,7 +778,7 @@
             
             if (shouldSync) {
                 clearTimeout(syncTimer);
-                syncTimer = setTimeout(() => { syncToServer(); }, 1000);
+                syncTimer = setTimeout(() => { syncTimer = null; syncToServer(); }, 1000);
             }
             updateTrackerUI();
         }
@@ -841,8 +881,8 @@
                 item.innerHTML = `
                     <div style="flex: 1; min-width: 0; padding-right: 8px;">
                         <div style="margin-bottom: 4px; display: flex; align-items: center;">
-                            <strong style="color: #3f51b5; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;">${t.memo}</strong>
-                            <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; flex-shrink: 0;">${t.card}</span>
+                            <strong style="color: #3f51b5; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;">${escHtml(t.memo)}</strong>
+                            <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; flex-shrink: 0;">${escHtml(t.card)}</span>
                         </div>
                         <div style="color: #888; font-size: 0.85rem;">
                             (${formatDateForDisplay(t.date)})
@@ -967,7 +1007,9 @@
 
             // 1. 카드사 자동 선택 (절대 실패하지 않는 직관적 방식)
             const cardSelect = document.getElementById('tx-card');
-            if (text.includes('삼성') || text.toLowerCase().includes('samsung')) {
+            if (text.includes('롯데') || text.toLowerCase().includes('lotte')) {
+                cardSelect.value = '롯데';
+            } else if (text.includes('삼성') || text.toLowerCase().includes('samsung')) {
                 cardSelect.value = '삼성';
             } else if (text.includes('농협') || text.toLowerCase().includes('nh')) {
                 cardSelect.value = 'NH';
@@ -1107,11 +1149,42 @@
             return String(value || '').replace(/\s+/g, ' ').trim();
         }
 
+        // 알림 수집기 앱이 보내는 "[앱:..]\n[패키지:..]\n[제목:..]..." 형식을 칸별로 나눕니다.
+        const INBOX_LABELS = ['앱', '패키지', '제목', '내용', '상세', '보조', '수신시각'];
+        function parseLabeledMessage(message) {
+            const text = String(message || '');
+            const head = new RegExp('^\\[(' + INBOX_LABELS.join('|') + '):');
+            if (!head.test(text)) return null;
+            const fields = {};
+            text.split(new RegExp('\\n(?=\\[(?:' + INBOX_LABELS.join('|') + '):)')).forEach(part => {
+                const m = part.match(head);
+                if (!m) return;
+                fields[m[1]] = part.slice(m[0].length).replace(/\]\s*$/, '').trim();
+            });
+            return fields;
+        }
+
+        // 금액·카드사·결제처를 찾을 본문 (앱 이름·패키지·수신시각 같은 꼬리표는 제외)
         function getInboxText(row) {
-            const parts = [row.message, row.app_name, row.package_name, row.title, row.text, row.big_text, row.sub_text]
-                .map(cleanText)
-                .filter(Boolean);
+            const f = parseLabeledMessage(row.message);
+            let parts;
+            if (f) {
+                parts = [f['제목'], f['내용'], f['상세'], f['보조']].map(cleanText).filter(Boolean);
+                // 긴 본문(상세)은 보통 내용을 그대로 포함하므로 겹치는 조각은 뺍니다.
+                parts = parts.filter((p, i) => !parts.some((q, j) => j !== i && q.length > p.length && q.includes(p)));
+            } else {
+                parts = [row.message, row.title, row.text, row.big_text, row.sub_text].map(cleanText).filter(Boolean);
+            }
             return [...new Set(parts)].join(' ');
+        }
+
+        function getInboxMeta(row) {
+            const f = parseLabeledMessage(row.message) || {};
+            return {
+                appName: f['앱'] || row.app_name || '',
+                packageName: f['패키지'] || row.package_name || '',
+                receivedAt: f['수신시각'] || ''
+            };
         }
 
         function detectCardFromText(text, row = {}) {
@@ -1133,7 +1206,11 @@
         }
 
         function inferNotificationDate(text, row) {
-            const created = row.created_at ? new Date(row.created_at) : new Date();
+            // 휴대폰이 알림을 받은 시각이 있으면 그것을 기준으로 (서버 도착 시각은 늦을 수 있음)
+            const received = getInboxMeta(row).receivedAt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            const created = received
+                ? new Date(+received[1], +received[2] - 1, +received[3])
+                : (row.created_at ? new Date(row.created_at) : new Date());
             let year = Number.isNaN(created.getTime()) ? new Date().getFullYear() : created.getFullYear();
             let month = Number.isNaN(created.getTime()) ? new Date().getMonth() + 1 : created.getMonth() + 1;
             let day = Number.isNaN(created.getTime()) ? new Date().getDate() : created.getDate();
@@ -1164,6 +1241,10 @@
                 .replace(/\d{2}:\d{2}(?::\d{2})?/g, ' ')
                 .replace(/[\n\r\[\]\(\)]/g, ' ')
                 .replace(/\s+/g, ' ')
+                // 남은 안내 단어와 기호만 있는 조각(*, /, :, · 등)을 지웁니다.
+                .split(' ')
+                .filter(w => w && !/^(결제|완료|사용|이용|알림|해외|국내|원)$/.test(w) && /[\p{L}\p{N}]/u.test(w))
+                .join(' ')
                 .trim();
         }
 
@@ -1171,7 +1252,8 @@
             const text = getInboxText(row);
             if (!text) return { ok: false, reason: '알림 본문이 비어 있음' };
 
-            const card = detectCardFromText(text, row);
+            const meta = getInboxMeta(row);
+            const card = detectCardFromText(text, { app_name: meta.appName, package_name: meta.packageName });
             if (!card) return { ok: false, reason: '카드사를 구분하지 못함', raw: text };
 
             let amount = extractAmountFromText(text);
@@ -1191,7 +1273,7 @@
                     memo,
                     date,
                     isAuto: true,
-                    source: row.app_name || row.package_name || '알림 자동수집'
+                    source: meta.appName || meta.packageName || '알림 자동수집'
                 }
             };
         }
@@ -1432,7 +1514,9 @@
             btn.disabled = true;
 
             try {
-                await syncToServer(); // 현재 화면에서 입력 중이던 값부터 먼저 보존
+                if (!loadOk) throw new Error('이 달 자료를 불러오지 못한 상태예요. 새로고침 후 다시 시도해 주세요.');
+                clearTimeout(syncTimer); syncTimer = null;
+                if (await syncToServer() === false) throw new Error('현재 화면 내용을 먼저 저장하지 못했어요.'); // 입력 중이던 값부터 보존
 
                 const { data, error } = await supabaseClient.from('sms_inbox').select('*');
                 if (error) throw error;
@@ -1488,11 +1572,13 @@
                 }
 
                 // 월별로 각각 저장. 현재 보고 있는 달도 포함됨.
+                // 하나라도 저장에 실패하면 알림 원문을 지우지 않고 멈춥니다 (다음에 다시 불러오면 중복은 자동 제외).
                 for (const [monthId, content] of monthCache.entries()) {
                     if (monthId === getViewId()) {
                         appData = content;
                     }
-                    await supabaseClient.from('my_budget_table').upsert({ id: monthId, content });
+                    const { error: saveError } = await supabaseClient.from('my_budget_table').upsert({ id: monthId, content });
+                    if (saveError) throw new Error(`${Math.floor(monthId / 100)}년 ${monthId % 100}월 저장 실패 · 알림 원문은 그대로 보관했어요.`);
                 }
 
                 // 성공/중복 처리한 원문만 삭제. 분석 실패 원문은 남겨둠.
@@ -1524,7 +1610,8 @@
             } catch (error) {
                 console.error('우체통 에러:', error);
                 setAutoImportStatus('우체통 확인 중 오류가 발생했습니다.', error?.message || String(error), 'error');
-                showToast('⚠️ 우체통 확인 중 에러가 발생했습니다.', 'error');
+                showToast('⚠️ ' + (error?.message || '우체통 확인 중 에러가 발생했습니다.'), 'error');
+                updateTrackerUI();
             } finally {
                 btn.innerText = originalText;
                 btn.style.background = '#ff9800';
