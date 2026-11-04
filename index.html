@@ -159,6 +159,25 @@
             transition: all 0.2s;
         }
 
+        /* ===== 로그인 화면 ===== */
+        #auth-gate { position: fixed; inset: 0; z-index: 20000; background: #f4f6f9; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+        body.authed #auth-gate { display: none; }
+        body:not(.authed) { overflow: hidden; }
+        .auth-card { width: 100%; max-width: 360px; background: #fff; border-radius: 16px; padding: 28px 24px; box-shadow: 0 8px 30px rgba(26,35,126,0.12); box-sizing: border-box; }
+        .auth-card h1 { margin: 0 0 6px; font-size: 1.4rem; color: #1a237e; }
+        .auth-card p { margin: 0 0 22px; color: #777; font-size: 0.9rem; line-height: 1.5; }
+        .auth-card label { display: block; font-size: 0.85rem; font-weight: bold; color: #555; margin: 0 0 6px; }
+        .auth-card input { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 14px; font-family: inherit; }
+        .auth-card input:focus { outline: none; border-color: #3f51b5; box-shadow: 0 0 0 3px #e8eaf6; }
+        .auth-card button { width: 100%; padding: 14px; border: none; border-radius: 8px; background: #1a237e; color: #fff; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        .auth-card button:disabled { background: #9fa8da; cursor: default; }
+        .auth-error { min-height: 1.2em; color: #c62828; font-size: 0.85rem; margin-top: 12px; text-align: center; white-space: pre-wrap; }
+        #btn-logout { position: absolute; top: 14px; left: 12px; background: rgba(255,255,255,0.15); color: #fff; border: none; border-radius: 6px; padding: 5px 9px; font-size: 0.75rem; cursor: pointer; display: none; }
+        body.authed #btn-logout { display: block; }
+        body.dark-mode #auth-gate { background: #121212; }
+        body.dark-mode .auth-card { background: #1e1e1e; box-shadow: none; }
+        body.dark-mode .auth-card h1 { color: #8c9eff; }
+        body.dark-mode .auth-card p, body.dark-mode .auth-card label { color: #aaa; }
     </style>
 </head>
 <body>
@@ -175,6 +194,7 @@
         </div>
     </div>
     <div class="header" onclick="triggerSecretTabs()" style="cursor: pointer; user-select: none;"> 💰가계부</div>
+    <button id="btn-logout" onclick="logout()" title="로그아웃">로그아웃</button>
     <button onclick="toggleDarkMode()" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer;" title="다크모드 켜기/끄기">
     🌗
     </button>
@@ -403,6 +423,19 @@
         </div>
     </div>
 
+    <!-- 로그인 화면: 로그인하고 가계부 주인으로 확인돼야 내용을 불러옵니다 -->
+    <div id="auth-gate">
+        <form class="auth-card" id="auth-form" autocomplete="on">
+            <h1>💰 가계부</h1>
+            <p>내 가계부는 로그인해야 볼 수 있어요.<br>한 번 로그인하면 이 기기에서는 계속 유지돼요.</p>
+            <label for="auth-email">이메일</label>
+            <input id="auth-email" type="email" autocomplete="username" required>
+            <label for="auth-password">비밀번호</label>
+            <input id="auth-password" type="password" autocomplete="current-password" required>
+            <button type="submit" id="auth-submit">로그인</button>
+            <div class="auth-error" id="auth-error" role="alert"></div>
+        </form>
+    </div>
     <script>
         const SUPABASE_URL = "https://pbzwcsaveufsqbmhygon.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiendjc2F2ZXVmc3FibWh5Z29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTQ2MTgsImV4cCI6MjA5MDc3MDYxOH0.sq8gWEF7ntiA3pL9DeDQ59rVNuDzXBkJSDJmC2OHIOE";
@@ -503,12 +536,94 @@
             checkReadOnly();
         }
 
-        window.onload = function () {
+        // ----------------------------------------
+        // 🔐 로그인
+        // 다른 앱(여행 정산 익명 방문자, 여행 일정 계정 등)도 같은 로그인 저장소를 쓰므로
+        // "로그인했다"가 아니라 "가계부 주인(budget_owners)인지"를 서버에서 확인합니다.
+        // ----------------------------------------
+        let appStarted = false;
+
+        async function checkBudgetOwner() {
+            const { data, error } = await supabaseClient.rpc('is_budget_owner');
+            if (error) {
+                // 권한 SQL(budget-auth.sql)을 아직 실행하지 않은 준비 기간에만 통과
+                if (error.code === 'PGRST202' || /Could not find the function/i.test(error.message || '')) return true;
+                throw error;
+            }
+            return data === true;
+        }
+
+        function showAuthGate(message = '') {
+            document.body.classList.remove('authed');
+            document.getElementById('auth-error').textContent = message;
+            const btn = document.getElementById('auth-submit');
+            btn.disabled = false; btn.textContent = '로그인';
+            setTimeout(() => document.getElementById('auth-email').focus(), 50);
+        }
+
+        function enterApp() {
+            document.body.classList.add('authed');
+            if (appStarted) { loadMonthData(); return; }
+            appStarted = true;
             // valueAsDate는 UTC 기준이라 한국 시간 오전 9시 전엔 어제 날짜가 들어감
             document.getElementById('tx-date').value = localTodayIso();
             restoreAutoImportStatus();
             loadMonthData();
             switchTab('track');
+        }
+
+        async function initAuth() {
+            try {
+                const { data } = await supabaseClient.auth.getSession();
+                if (data.session && await checkBudgetOwner()) return enterApp();
+                if (data.session) await supabaseClient.auth.signOut();
+                showAuthGate();
+            } catch (err) {
+                console.error('로그인 확인 실패', err);
+                showAuthGate('서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.');
+            }
+        }
+
+        async function login(event) {
+            event.preventDefault();
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value;
+            const btn = document.getElementById('auth-submit');
+            const errEl = document.getElementById('auth-error');
+            btn.disabled = true; btn.textContent = '확인 중…'; errEl.textContent = '';
+            try {
+                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) return showAuthGate('이메일 또는 비밀번호가 맞지 않아요.');
+                if (!(await checkBudgetOwner())) {
+                    await supabaseClient.auth.signOut();
+                    return showAuthGate('이 계정은 가계부를 볼 권한이 없어요.');
+                }
+                document.getElementById('auth-password').value = '';
+                enterApp();
+            } catch (err) {
+                console.error('로그인 실패', err);
+                showAuthGate('로그인 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+            }
+        }
+
+        async function logout() {
+            if (!confirm('로그아웃할까요?')) return;
+            if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; await syncToServer(); }
+            await supabaseClient.auth.signOut();
+        }
+
+        // 다른 탭에서 로그아웃했거나 로그인 유지 기간이 끝나면 바로 잠금
+        supabaseClient.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_OUT') {
+                loadOk = false;
+                ++loadSeq;
+                showAuthGate();
+            }
+        });
+
+        window.onload = function () {
+            document.getElementById('auth-form').addEventListener('submit', login);
+            initAuth();
         };
 
         function checkReadOnly() {
@@ -533,6 +648,7 @@
             const shouldLock = isPast && !forceEditMode;
             const inputs = document.querySelectorAll('input, textarea, select, button.primary-btn, button.reset-btn');
             inputs.forEach(el => {
+                if (el.closest('#auth-gate')) return;
                 if(el.id !== 'btn-memo-edit') { el.disabled = shouldLock; }
             });
             document.getElementById('btn-memo-edit').style.display = shouldLock ? 'none' : 'block';
