@@ -437,8 +437,10 @@
         </form>
     </div>
     <script>
-        const SUPABASE_URL = "https://pbzwcsaveufsqbmhygon.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiendjc2F2ZXVmc3FibWh5Z29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTQ2MTgsImV4cCI6MjA5MDc3MDYxOH0.sq8gWEF7ntiA3pL9DeDQ59rVNuDzXBkJSDJmC2OHIOE";
+        // 개인용(돈 관련) Supabase 프로젝트. 공개용 publishable 키라 코드에 있어도 괜찮아요.
+        // 실제 보호는 로그인 + 권한 정책(supabase/migration/1-new-project-setup.sql)이 해요.
+        const SUPABASE_URL = "__NEW_SUPABASE_URL__";
+        const SUPABASE_KEY = "__NEW_SUPABASE_PUBLISHABLE_KEY__";
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let appData = {
@@ -539,15 +541,13 @@
         // ----------------------------------------
         // 🔐 로그인
         // 다른 앱(여행 정산 익명 방문자, 여행 일정 계정 등)도 같은 로그인 저장소를 쓰므로
-        // "로그인했다"가 아니라 "가계부 주인(budget_owners)인지"를 서버에서 확인합니다.
+        // "로그인했다"가 아니라 "주인(owners)인지"를 서버에서 확인합니다.
         // ----------------------------------------
         let appStarted = false;
 
         async function checkBudgetOwner() {
-            const { data, error } = await supabaseClient.rpc('is_budget_owner');
+            const { data, error } = await supabaseClient.rpc('is_owner');
             if (error) {
-                // 권한 SQL(budget-auth.sql)을 아직 실행하지 않은 준비 기간에만 통과
-                if (error.code === 'PGRST202' || /Could not find the function/i.test(error.message || '')) return true;
                 throw error;
             }
             return data === true;
