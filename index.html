@@ -437,11 +437,11 @@
         </form>
     </div>
     <script>
-        // 개인용(돈 관련) Supabase 프로젝트. 공개용 publishable 키라 코드에 있어도 괜찮아요.
-        // 실제 보호는 로그인 + 권한 정책(supabase/migration/1-new-project-setup.sql)이 해요.
-        const SUPABASE_URL = "__NEW_SUPABASE_URL__";
-        const SUPABASE_KEY = "__NEW_SUPABASE_PUBLISHABLE_KEY__";
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // 프로젝트 2(예절퀘스트와 같은 곳)의 money 스키마. 공개용 publishable 키라 코드에 있어도 괜찮아요.
+        // 실제 보호는 로그인 + 권한 정책(supabase/migration/1-setup-money-schema.sql)이 해요.
+        const SUPABASE_URL = "https://wlrenrjgwqefumsenihc.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_cLjOP5RHJNzS5fJlGaA9TA_Heu3DNKS";
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'money' } });
 
         let appData = {
             income: '2,100,000', extraIncome: '0', savings: '0', invest: '0', fixed: '480,000', subscribe: '0', kye: '160,000', installment: '280,000',
