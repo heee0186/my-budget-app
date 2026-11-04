@@ -159,6 +159,25 @@
             transition: all 0.2s;
         }
 
+        /* ===== 로그인 화면 ===== */
+        #auth-gate { position: fixed; inset: 0; z-index: 20000; background: #f4f6f9; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
+        body.authed #auth-gate { display: none; }
+        body:not(.authed) { overflow: hidden; }
+        .auth-card { width: 100%; max-width: 360px; background: #fff; border-radius: 16px; padding: 28px 24px; box-shadow: 0 8px 30px rgba(26,35,126,0.12); box-sizing: border-box; }
+        .auth-card h1 { margin: 0 0 6px; font-size: 1.4rem; color: #1a237e; }
+        .auth-card p { margin: 0 0 22px; color: #777; font-size: 0.9rem; line-height: 1.5; }
+        .auth-card label { display: block; font-size: 0.85rem; font-weight: bold; color: #555; margin: 0 0 6px; }
+        .auth-card input { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 14px; font-family: inherit; }
+        .auth-card input:focus { outline: none; border-color: #3f51b5; box-shadow: 0 0 0 3px #e8eaf6; }
+        .auth-card button { width: 100%; padding: 14px; border: none; border-radius: 8px; background: #1a237e; color: #fff; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        .auth-card button:disabled { background: #9fa8da; cursor: default; }
+        .auth-error { min-height: 1.2em; color: #c62828; font-size: 0.85rem; margin-top: 12px; text-align: center; white-space: pre-wrap; }
+        #btn-logout { position: absolute; top: 14px; left: 12px; background: rgba(255,255,255,0.15); color: #fff; border: none; border-radius: 6px; padding: 5px 9px; font-size: 0.75rem; cursor: pointer; display: none; }
+        body.authed #btn-logout { display: block; }
+        body.dark-mode #auth-gate { background: #121212; }
+        body.dark-mode .auth-card { background: #1e1e1e; box-shadow: none; }
+        body.dark-mode .auth-card h1 { color: #8c9eff; }
+        body.dark-mode .auth-card p, body.dark-mode .auth-card label { color: #aaa; }
     </style>
 </head>
 <body>
@@ -175,6 +194,7 @@
         </div>
     </div>
     <div class="header" onclick="triggerSecretTabs()" style="cursor: pointer; user-select: none;"> 💰가계부</div>
+    <button id="btn-logout" onclick="logout()" title="로그아웃">로그아웃</button>
     <button onclick="toggleDarkMode()" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer;" title="다크모드 켜기/끄기">
     🌗
     </button>
@@ -403,6 +423,19 @@
         </div>
     </div>
 
+    <!-- 로그인 화면: 로그인하고 가계부 주인으로 확인돼야 내용을 불러옵니다 -->
+    <div id="auth-gate">
+        <form class="auth-card" id="auth-form" autocomplete="on">
+            <h1>💰 가계부</h1>
+            <p>내 가계부는 로그인해야 볼 수 있어요.<br>한 번 로그인하면 이 기기에서는 계속 유지돼요.</p>
+            <label for="auth-email">이메일</label>
+            <input id="auth-email" type="email" autocomplete="username" required>
+            <label for="auth-password">비밀번호</label>
+            <input id="auth-password" type="password" autocomplete="current-password" required>
+            <button type="submit" id="auth-submit">로그인</button>
+            <div class="auth-error" id="auth-error" role="alert"></div>
+        </form>
+    </div>
     <script>
         const SUPABASE_URL = "https://pbzwcsaveufsqbmhygon.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiendjc2F2ZXVmc3FibWh5Z29uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTQ2MTgsImV4cCI6MjA5MDc3MDYxOH0.sq8gWEF7ntiA3pL9DeDQ59rVNuDzXBkJSDJmC2OHIOE";
@@ -421,9 +454,29 @@
         let forceEditMode = false;
         let isMemoEditMode = false;
 
+        // 서버에서 이 달 자료를 정상적으로 불러왔을 때만 저장을 허용합니다.
+        // (불러오기 실패 상태에서 저장하면 0으로 된 기본값이 실제 자료를 덮어씁니다)
+        let loadOk = false;
+        let loadSeq = 0;
+
         function getViewId() { return viewYear * 100 + viewMonth; }
 
-        function changeMonth(delta) {
+        function escHtml(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function localTodayIso() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        async function changeMonth(delta) {
+            // 1초 대기 중인 자동저장이 있으면 달을 넘기기 전에 지금 달에 먼저 저장
+            if (syncTimer) {
+                clearTimeout(syncTimer);
+                syncTimer = null;
+                await syncToServer();
+            }
             viewMonth += delta;
             if (viewMonth < 1) { viewMonth = 12; viewYear--; }
             if (viewMonth > 12) { viewMonth = 1; viewYear++; }
@@ -441,10 +494,13 @@
             };
 
             document.getElementById('month-display').innerText = "데이터 로딩 중...";
+            const seq = ++loadSeq;
+            loadOk = false;
 
             try {
                 const { data, error } = await supabaseClient.from('my_budget_table').select('content').eq('id', getViewId());
-                if (error && error.code !== 'PGRST116') throw error; 
+                if (seq !== loadSeq) return; // 그새 다른 달로 넘어감
+                if (error && error.code !== 'PGRST116') throw error;
                 
                 let isNewMonth = true; // 빈 데이터({})가 있을 때를 대비한 꼼수
 
@@ -461,25 +517,113 @@
                     let prevId = prevYear * 100 + prevMonth;
                     
                     const { data: prevData } = await supabaseClient.from('my_budget_table').select('content').eq('id', prevId);
+                    if (seq !== loadSeq) return;
                     if (prevData && prevData.length > 0 && prevData[0].content) {
                         appData.memoFixedList = prevData[0].content.memoFixedList || [];
                         appData.memoSubscribeList = prevData[0].content.memoSubscribeList || [];
                         appData.memoInstallmentList = prevData[0].content.memoInstallmentList || [];
                     }
                 }
+                if (!Array.isArray(appData.transactions)) appData.transactions = [];
+                loadOk = true;
             } catch (err) {
+                if (seq !== loadSeq) return;
                 console.error("불러오기 실패", err);
+                showToast('⚠️ 이 달 자료를 불러오지 못했어요.\n새로고침 전까지는 저장하지 않아요.', 'error');
             }
 
             applyDataToUI();
             checkReadOnly();
         }
 
-        window.onload = function () {
-            document.getElementById('tx-date').valueAsDate = new Date();
+        // ----------------------------------------
+        // 🔐 로그인
+        // 다른 앱(여행 정산 익명 방문자, 여행 일정 계정 등)도 같은 로그인 저장소를 쓰므로
+        // "로그인했다"가 아니라 "가계부 주인(budget_owners)인지"를 서버에서 확인합니다.
+        // ----------------------------------------
+        let appStarted = false;
+
+        async function checkBudgetOwner() {
+            const { data, error } = await supabaseClient.rpc('is_budget_owner');
+            if (error) {
+                // 권한 SQL(budget-auth.sql)을 아직 실행하지 않은 준비 기간에만 통과
+                if (error.code === 'PGRST202' || /Could not find the function/i.test(error.message || '')) return true;
+                throw error;
+            }
+            return data === true;
+        }
+
+        function showAuthGate(message = '') {
+            document.body.classList.remove('authed');
+            document.getElementById('auth-error').textContent = message;
+            const btn = document.getElementById('auth-submit');
+            btn.disabled = false; btn.textContent = '로그인';
+            setTimeout(() => document.getElementById('auth-email').focus(), 50);
+        }
+
+        function enterApp() {
+            document.body.classList.add('authed');
+            if (appStarted) { loadMonthData(); return; }
+            appStarted = true;
+            // valueAsDate는 UTC 기준이라 한국 시간 오전 9시 전엔 어제 날짜가 들어감
+            document.getElementById('tx-date').value = localTodayIso();
             restoreAutoImportStatus();
             loadMonthData();
             switchTab('track');
+        }
+
+        async function initAuth() {
+            try {
+                const { data } = await supabaseClient.auth.getSession();
+                if (data.session && await checkBudgetOwner()) return enterApp();
+                if (data.session) await supabaseClient.auth.signOut();
+                showAuthGate();
+            } catch (err) {
+                console.error('로그인 확인 실패', err);
+                showAuthGate('서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.');
+            }
+        }
+
+        async function login(event) {
+            event.preventDefault();
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value;
+            const btn = document.getElementById('auth-submit');
+            const errEl = document.getElementById('auth-error');
+            btn.disabled = true; btn.textContent = '확인 중…'; errEl.textContent = '';
+            try {
+                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) return showAuthGate('이메일 또는 비밀번호가 맞지 않아요.');
+                if (!(await checkBudgetOwner())) {
+                    await supabaseClient.auth.signOut();
+                    return showAuthGate('이 계정은 가계부를 볼 권한이 없어요.');
+                }
+                document.getElementById('auth-password').value = '';
+                enterApp();
+            } catch (err) {
+                console.error('로그인 실패', err);
+                showAuthGate('로그인 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+            }
+        }
+
+        async function logout() {
+            if (!confirm('로그아웃할까요?')) return;
+            if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; await syncToServer(); }
+            await supabaseClient.auth.signOut();
+        }
+
+        // 다른 탭에서 로그아웃했거나 로그인 유지 기간이 끝나면 바로 잠금
+        supabaseClient.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_OUT') {
+                loadOk = false;
+                ++loadSeq;
+                showAuthGate();
+            }
+        });
+
+        window.onload = function () {
+            document.getElementById('auth-form').addEventListener('submit', login);
+            initAuth();
         };
 
         function checkReadOnly() {
@@ -504,6 +648,7 @@
             const shouldLock = isPast && !forceEditMode;
             const inputs = document.querySelectorAll('input, textarea, select, button.primary-btn, button.reset-btn');
             inputs.forEach(el => {
+                if (el.closest('#auth-gate')) return;
                 if(el.id !== 'btn-memo-edit') { el.disabled = shouldLock; }
             });
             document.getElementById('btn-memo-edit').style.display = shouldLock ? 'none' : 'block';
@@ -523,10 +668,21 @@
             const isPast = (viewYear < realYear) || (viewYear === realYear && viewMonth < realMonth);
             
             // 과거인데 강제수정 모드도 아니라면 저장(서버통신) 차단
-            if (isPast && !forceEditMode) return;
+            if (isPast && !forceEditMode) return true;
+
+            if (!loadOk) {
+                showToast('⚠️ 자료를 불러오지 못한 상태라 저장하지 않았어요.\n새로고침해 주세요.', 'error');
+                return false;
+            }
 
             // upsert: 데이터가 없으면 새로 만들고, 있으면 덮어씌움 (월별 관리 핵심 기술)
-            await supabaseClient.from('my_budget_table').upsert({ id: getViewId(), content: appData });
+            const { error } = await supabaseClient.from('my_budget_table').upsert({ id: getViewId(), content: appData });
+            if (error) {
+                console.error('저장 실패', error);
+                showToast('⚠️ 저장에 실패했어요. 인터넷 연결을 확인해 주세요.', 'error');
+                return false;
+            }
+            return true;
         }
 
        function applyDataToUI() {
@@ -638,7 +794,7 @@
                     return `
                     <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed #eee; padding:2px 0; font-size:0.85rem;">
                         <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                            ${item.name || '-'} ${dateSuffix && item.date ? `<span style="color:#888; font-size:0.75rem; margin-left:4px;">(${item.date}${dateSuffix})</span>` : ''}
+                            ${escHtml(item.name || '-')} ${dateSuffix && item.date ? `<span style="color:#888; font-size:0.75rem; margin-left:4px;">(${escHtml(item.date)}${dateSuffix})</span>` : ''}
                         </span>
                         <span style="color: ${isNeg ? '#d32f2f' : '#3f51b5'}; font-weight:bold; flex-shrink:0; margin-left:10px;">${formattedAmt}</span>
                     </div>
@@ -682,12 +838,12 @@
             if(type !== 'income') {
                 // 타입이 installment 이면 남은회차, 그 외는 일
                 let placeholderText = (type === 'installment') ? '남은회차' : '일';
-                dateInput = `<input type="text" class="i-date" placeholder="${placeholderText}" value="${data.date || ''}" style="width:15%; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">`;
+                dateInput = `<input type="text" class="i-date" placeholder="${placeholderText}" value="${escHtml(data.date || '')}" style="width:15%; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">`;
             }
 
             div.innerHTML = `
-                <input type="text" class="i-name" placeholder="항목" value="${data.name || ''}" style="width:${type === 'income' ? '60%' : '45%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">
-                <input type="text" class="i-amt" placeholder="금액" value="${data.amt || ''}" oninput="formatNumberInputOnly(this)" style="width:${type === 'income' ? '30%' : '30%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem; text-align:right;">
+                <input type="text" class="i-name" placeholder="항목" value="${escHtml(data.name || '')}" style="width:${type === 'income' ? '60%' : '45%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;">
+                <input type="text" class="i-amt" placeholder="금액" value="${escHtml(data.amt || '')}" oninput="formatNumberInputOnly(this)" style="width:${type === 'income' ? '30%' : '30%'}; padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem; text-align:right;">
                 ${dateInput}
                 <button onclick="this.parentElement.remove()" style="width:10%; background:#f44336; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer; padding:2px;">X</button>
             `;
@@ -738,7 +894,7 @@
             
             if (shouldSync) {
                 clearTimeout(syncTimer);
-                syncTimer = setTimeout(() => { syncToServer(); }, 1000);
+                syncTimer = setTimeout(() => { syncTimer = null; syncToServer(); }, 1000);
             }
             updateTrackerUI();
         }
@@ -841,8 +997,8 @@
                 item.innerHTML = `
                     <div style="flex: 1; min-width: 0; padding-right: 8px;">
                         <div style="margin-bottom: 4px; display: flex; align-items: center;">
-                            <strong style="color: #3f51b5; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;">${t.memo}</strong>
-                            <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; flex-shrink: 0;">${t.card}</span>
+                            <strong style="color: #3f51b5; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;">${escHtml(t.memo)}</strong>
+                            <span style="display: inline-block; padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-size: 0.65rem; color: #475569; margin-left: 6px; flex-shrink: 0;">${escHtml(t.card)}</span>
                         </div>
                         <div style="color: #888; font-size: 0.85rem;">
                             (${formatDateForDisplay(t.date)})
@@ -967,7 +1123,9 @@
 
             // 1. 카드사 자동 선택 (절대 실패하지 않는 직관적 방식)
             const cardSelect = document.getElementById('tx-card');
-            if (text.includes('삼성') || text.toLowerCase().includes('samsung')) {
+            if (text.includes('롯데') || text.toLowerCase().includes('lotte')) {
+                cardSelect.value = '롯데';
+            } else if (text.includes('삼성') || text.toLowerCase().includes('samsung')) {
                 cardSelect.value = '삼성';
             } else if (text.includes('농협') || text.toLowerCase().includes('nh')) {
                 cardSelect.value = 'NH';
@@ -1107,11 +1265,42 @@
             return String(value || '').replace(/\s+/g, ' ').trim();
         }
 
+        // 알림 수집기 앱이 보내는 "[앱:..]\n[패키지:..]\n[제목:..]..." 형식을 칸별로 나눕니다.
+        const INBOX_LABELS = ['앱', '패키지', '제목', '내용', '상세', '보조', '수신시각'];
+        function parseLabeledMessage(message) {
+            const text = String(message || '');
+            const head = new RegExp('^\\[(' + INBOX_LABELS.join('|') + '):');
+            if (!head.test(text)) return null;
+            const fields = {};
+            text.split(new RegExp('\\n(?=\\[(?:' + INBOX_LABELS.join('|') + '):)')).forEach(part => {
+                const m = part.match(head);
+                if (!m) return;
+                fields[m[1]] = part.slice(m[0].length).replace(/\]\s*$/, '').trim();
+            });
+            return fields;
+        }
+
+        // 금액·카드사·결제처를 찾을 본문 (앱 이름·패키지·수신시각 같은 꼬리표는 제외)
         function getInboxText(row) {
-            const parts = [row.message, row.app_name, row.package_name, row.title, row.text, row.big_text, row.sub_text]
-                .map(cleanText)
-                .filter(Boolean);
+            const f = parseLabeledMessage(row.message);
+            let parts;
+            if (f) {
+                parts = [f['제목'], f['내용'], f['상세'], f['보조']].map(cleanText).filter(Boolean);
+                // 긴 본문(상세)은 보통 내용을 그대로 포함하므로 겹치는 조각은 뺍니다.
+                parts = parts.filter((p, i) => !parts.some((q, j) => j !== i && q.length > p.length && q.includes(p)));
+            } else {
+                parts = [row.message, row.title, row.text, row.big_text, row.sub_text].map(cleanText).filter(Boolean);
+            }
             return [...new Set(parts)].join(' ');
+        }
+
+        function getInboxMeta(row) {
+            const f = parseLabeledMessage(row.message) || {};
+            return {
+                appName: f['앱'] || row.app_name || '',
+                packageName: f['패키지'] || row.package_name || '',
+                receivedAt: f['수신시각'] || ''
+            };
         }
 
         function detectCardFromText(text, row = {}) {
@@ -1133,7 +1322,11 @@
         }
 
         function inferNotificationDate(text, row) {
-            const created = row.created_at ? new Date(row.created_at) : new Date();
+            // 휴대폰이 알림을 받은 시각이 있으면 그것을 기준으로 (서버 도착 시각은 늦을 수 있음)
+            const received = getInboxMeta(row).receivedAt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            const created = received
+                ? new Date(+received[1], +received[2] - 1, +received[3])
+                : (row.created_at ? new Date(row.created_at) : new Date());
             let year = Number.isNaN(created.getTime()) ? new Date().getFullYear() : created.getFullYear();
             let month = Number.isNaN(created.getTime()) ? new Date().getMonth() + 1 : created.getMonth() + 1;
             let day = Number.isNaN(created.getTime()) ? new Date().getDate() : created.getDate();
@@ -1164,6 +1357,10 @@
                 .replace(/\d{2}:\d{2}(?::\d{2})?/g, ' ')
                 .replace(/[\n\r\[\]\(\)]/g, ' ')
                 .replace(/\s+/g, ' ')
+                // 남은 안내 단어와 기호만 있는 조각(*, /, :, · 등)을 지웁니다.
+                .split(' ')
+                .filter(w => w && !/^(결제|완료|사용|이용|알림|해외|국내|원)$/.test(w) && /[\p{L}\p{N}]/u.test(w))
+                .join(' ')
                 .trim();
         }
 
@@ -1171,7 +1368,8 @@
             const text = getInboxText(row);
             if (!text) return { ok: false, reason: '알림 본문이 비어 있음' };
 
-            const card = detectCardFromText(text, row);
+            const meta = getInboxMeta(row);
+            const card = detectCardFromText(text, { app_name: meta.appName, package_name: meta.packageName });
             if (!card) return { ok: false, reason: '카드사를 구분하지 못함', raw: text };
 
             let amount = extractAmountFromText(text);
@@ -1191,7 +1389,7 @@
                     memo,
                     date,
                     isAuto: true,
-                    source: row.app_name || row.package_name || '알림 자동수집'
+                    source: meta.appName || meta.packageName || '알림 자동수집'
                 }
             };
         }
@@ -1432,7 +1630,9 @@
             btn.disabled = true;
 
             try {
-                await syncToServer(); // 현재 화면에서 입력 중이던 값부터 먼저 보존
+                if (!loadOk) throw new Error('이 달 자료를 불러오지 못한 상태예요. 새로고침 후 다시 시도해 주세요.');
+                clearTimeout(syncTimer); syncTimer = null;
+                if (await syncToServer() === false) throw new Error('현재 화면 내용을 먼저 저장하지 못했어요.'); // 입력 중이던 값부터 보존
 
                 const { data, error } = await supabaseClient.from('sms_inbox').select('*');
                 if (error) throw error;
@@ -1488,11 +1688,13 @@
                 }
 
                 // 월별로 각각 저장. 현재 보고 있는 달도 포함됨.
+                // 하나라도 저장에 실패하면 알림 원문을 지우지 않고 멈춥니다 (다음에 다시 불러오면 중복은 자동 제외).
                 for (const [monthId, content] of monthCache.entries()) {
                     if (monthId === getViewId()) {
                         appData = content;
                     }
-                    await supabaseClient.from('my_budget_table').upsert({ id: monthId, content });
+                    const { error: saveError } = await supabaseClient.from('my_budget_table').upsert({ id: monthId, content });
+                    if (saveError) throw new Error(`${Math.floor(monthId / 100)}년 ${monthId % 100}월 저장 실패 · 알림 원문은 그대로 보관했어요.`);
                 }
 
                 // 성공/중복 처리한 원문만 삭제. 분석 실패 원문은 남겨둠.
@@ -1524,7 +1726,8 @@
             } catch (error) {
                 console.error('우체통 에러:', error);
                 setAutoImportStatus('우체통 확인 중 오류가 발생했습니다.', error?.message || String(error), 'error');
-                showToast('⚠️ 우체통 확인 중 에러가 발생했습니다.', 'error');
+                showToast('⚠️ ' + (error?.message || '우체통 확인 중 에러가 발생했습니다.'), 'error');
+                updateTrackerUI();
             } finally {
                 btn.innerText = originalText;
                 btn.style.background = '#ff9800';
