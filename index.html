@@ -62,79 +62,11 @@
         
         #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; font-weight: bold; color: #1a237e; }
         .memo-display-box { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 4px; padding: 4px 8px; /* 위아래 패딩을 4px로 대폭 줄임 */margin-bottom: 6px; font-size: 0.85rem; }
-
-        /* 1. 지출 내역 상자 안쪽에 숨통 트여주기 (오른쪽 여백 12px) */
         #history-list { padding-right: 12px; }
-
-        /* 2. 스크롤바 여리여리하고 예쁘게 성형 */
         #history-list::-webkit-scrollbar { width: 6px; /* 8px에서 6px로 더 얇게! */ }
         #history-list::-webkit-scrollbar-track { background: transparent; /* 촌스러운 회색 배경 날리고 투명하게 */ }
         #history-list::-webkit-scrollbar-thumb { background: #d1d5db; /* 연하고 부드러운 조약돌 색상 */border-radius: 10px; /* 완전 동글동글하게 */ }
         #history-list::-webkit-scrollbar-thumb:hover { background: #9ca3af; /* 마우스 올리면 살짝 진해짐 */ }
-
-        /* =========================================
-           🌙 완벽한 다크모드 CSS (브라우저 번역 무시버전)
-        ========================================= */
-        body.dark-mode { background-color: #121212 !important; color: #e0e0e0 !important; }
-        
-        /* 1. 겉껍데기(카드, 컨테이너 등) 어둡게 */
-        body.dark-mode .card,
-        body.dark-mode .tab-nav,
-        body.dark-mode .tab-btn.active,
-        body.dark-mode .memo-display-box,
-        body.dark-mode .alert-box,
-        body.dark-mode .success-box,
-        body.dark-mode #bill-calc-content {
-            background-color: #1e1e1e !important;
-            border-color: #333 !important;
-            color: #e0e0e0 !important;
-        }
-
-        /* 2. 최상단 헤더 날짜 영역 & 청구대금 계산기 버튼 */
-        body.dark-mode > div:nth-child(3), 
-        body.dark-mode div[onclick="toggleBillCalc()"] {
-            background-color: #1e1e1e !important;
-            border-color: #333 !important;
-            color: #e0e0e0 !important;
-        }
-
-        /* 3. 폼 요소 어둡게 (입력창, 셀렉트박스 등) */
-        body.dark-mode input,
-        body.dark-mode select,
-        body.dark-mode textarea {
-            background-color: #2c2c2c !important;
-            color: #e0e0e0 !important;
-            border-color: #555 !important;
-        }
-
-        /* 4. 카톡 문자 자동입력 배경 등 회색 박스들 */
-        body.dark-mode .input-group > div > div:first-child,
-        body.dark-mode div[style*="background: #eff8ff"] {
-            background-color: #2c2c2c !important;
-            border-color: #444 !important;
-        }
-
-        /* 5. 텍스트 컬러 보정 (파란색, 검은색 등 무력화) */
-        body.dark-mode strong { color: #e0e0e0 !important; }
-        body.dark-mode .section-title, 
-        body.dark-mode .section-title-1 { color: #8c9eff !important; border-bottom-color: #444 !important; }
-        
-        /* 6. 지출 내역 리스트 완벽 제어 */
-        body.dark-mode .history-item { border-bottom-color: #333 !important; }
-        body.dark-mode .history-item div { color: #aaa !important; } /* 메모 텍스트 회색으로 */
-        
-        /* 뱃지 및 작은 텍스트 설정 */
-        body.dark-mode .history-item span { background-color: transparent !important; color: #888 !important; } 
-        body.dark-mode .history-item > div:first-child > div:first-child > span { 
-            background-color: #333 !important; 
-            color: #ccc !important; 
-        }
-
-        /* 7. 상세 내역(3번 탭) 리스트 선 어둡게 */
-        body.dark-mode div[style*="border-bottom:1px dashed #eee"],
-        body.dark-mode div[style*="border-top:2px solid #ccc"] { 
-            border-color: #444 !important; 
-        }
 
         /* 🎨 드롭다운(셀렉트 박스) 예쁘게 성형하기 */
         .input-group select {
@@ -174,10 +106,6 @@
         .auth-error { min-height: 1.2em; color: #c62828; font-size: 0.85rem; margin-top: 12px; text-align: center; white-space: pre-wrap; }
         #btn-logout { position: absolute; top: 14px; left: 12px; background: rgba(255,255,255,0.15); color: #fff; border: none; border-radius: 6px; padding: 5px 9px; font-size: 0.75rem; cursor: pointer; display: none; }
         body.authed #btn-logout { display: block; }
-        body.dark-mode #auth-gate { background: #121212; }
-        body.dark-mode .auth-card { background: #1e1e1e; box-shadow: none; }
-        body.dark-mode .auth-card h1 { color: #8c9eff; }
-        body.dark-mode .auth-card p, body.dark-mode .auth-card label { color: #aaa; }
 
         /* ===== 청구월 가계부 (v2) ===== */
         .month-bar { text-align: center; padding: 12px 0 10px; background: white; border-bottom: 1px solid #eee; position: relative; }
@@ -231,36 +159,11 @@
         .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 30px; color: #fff; font-weight: bold; font-size: 0.95rem; z-index: 10000; box-shadow: 0 4px 12px rgba(0,0,0,0.2); transition: all 0.3s; opacity: 0; white-space: pre-wrap; text-align: center; pointer-events: none; }
         .toast.show { opacity: 1; bottom: 50px; }
         .toast-success { background: #4CAF50; } .toast-info { background: #607D8B; } .toast-warning { background: #FF9800; } .toast-error { background: #F44336; }
-        body.dark-mode .month-bar { background: #1e1e1e; border-color: #333; color: #e0e0e0; }
-        body.dark-mode .summary-card { border-color: #5c6bc0 !important; }
-        body.dark-mode .sum-spent { color: #9fa8da; }
-        body.dark-mode .chip { background: #2c2c2c; border-color: #555; color: #ccc; }
-        body.dark-mode .chip.on { background: #3949ab; border-color: #3949ab; color: #fff; }
-        body.dark-mode .review-item { background: #2a2418; border-color: #5d4a1f; }
-        body.dark-mode .h-name { color: #e0e0e0; }
-        body.dark-mode .memo-line { border-color: #444; }
-        body.dark-mode .month-arrow { color: #e0e0e0; }
-        body.dark-mode #sum-bar[style*="rgb(26, 35, 126)"], body.dark-mode #sum-bar[style*="#1a237e"] { background: #7986cb !important; }
     </style>
 </head>
 <body>
-    <div id="secret-pwd-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center;">
-        <div class="card" style="width: 80%; max-width: 300px; text-align: center; padding: 30px 20px; margin: 0; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
-            <div style="font-size: 2.5rem; margin-bottom: 10px;">🔒</div>
-            <h3 style="margin-top: 0; margin-bottom: 20px; color: #1a237e;">비밀번호 입력</h3>
-            <input type="password" id="global-pwd-input" inputmode="numeric" pattern="[0-9]*" placeholder="비밀번호" onkeypress="if(event.key === 'Enter') checkGlobalPassword();" style="width: 100%; padding: 12px; margin-bottom: 15px; text-align: center; font-size: 1.2rem; letter-spacing: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
-
-            <div style="display: flex; gap: 10px;">
-                <button onclick="document.getElementById('secret-pwd-modal').style.display='none';" style="flex: 1; padding: 12px; border: none; border-radius: 6px; background: #eee; cursor: pointer; font-weight: bold; color: #333;">취소</button>
-                <button onclick="checkGlobalPassword()" style="flex: 1; padding: 12px; border: none; border-radius: 6px; background: #3f51b5; color: white; cursor: pointer; font-weight: bold;">확인</button>
-            </div>
-        </div>
-    </div>
-    <div class="header" onclick="triggerSecretTabs()" style="cursor: pointer; user-select: none;"> 💰가계부</div>
+    <div class="header"> 💰가계부</div>
     <button id="btn-logout" onclick="logout()" title="로그아웃">로그아웃</button>
-    <button onclick="toggleDarkMode()" style="position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer;" title="다크모드 켜기/끄기">
-    🌗
-    </button>
 
     <div class="month-bar">
         <button onclick="changeMonth(-1)" class="month-arrow" aria-label="이전 청구월">◀</button>
@@ -273,9 +176,9 @@
     </div>
 
     <div class="tab-nav">
-        <div class="tab-btn" id="btn-plan" onclick="switchTab('plan')" style="display: none;">📋 예산 설계</div>
+        <div class="tab-btn" id="btn-plan" onclick="switchTab('plan')">📋 예산 설계</div>
         <div class="tab-btn active" id="btn-track" onclick="switchTab('track')">💳 지출</div>
-        <div class="tab-btn" id="btn-memo" onclick="switchTab('memo')" style="display: none;">📝 상세 내역</div>
+        <div class="tab-btn" id="btn-memo" onclick="switchTab('memo')">📝 상세 내역</div>
     </div>
 
     <div class="container">
@@ -692,7 +595,7 @@
             bar.style.width = pct + '%';
             bar.style.background = remain < 0 ? '#f44336' : (totalBudget && remain / totalBudget <= 0.2 ? '#ff9800' : '#1a237e');
             const remainEl = document.getElementById('sum-remain');
-            if (!totalBudget) remainEl.innerHTML = '<span class="muted">예산은 헤더를 세 번 눌러 [예산 설계]에서 정해요.</span>';
+            if (!totalBudget) remainEl.innerHTML = '<span class="muted">예산은 [예산 설계] 탭에서 정해요.</span>';
             else remainEl.innerHTML = remain >= 0
                 ? `남은 예산 <b style="color:#2e7d32">${won(remain)}</b>`
                 : `예산 초과 <b style="color:#d32f2f">${won(-remain)}</b>`;
@@ -1051,46 +954,6 @@
             document.body.appendChild(toast);
             setTimeout(() => toast.classList.add('show'), 10);
             setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
-        }
-
-        // ---------------- 다크모드 ----------------
-        function toggleDarkMode() {
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem('myBudgetDarkMode', document.body.classList.contains('dark-mode') ? 'yes' : 'no');
-        }
-        window.addEventListener('DOMContentLoaded', () => {
-            if (localStorage.getItem('myBudgetDarkMode') === 'yes') document.body.classList.add('dark-mode');
-        });
-
-        // ---------------- 숨김 탭 (헤더 세 번 누르기) ----------------
-        const SECRET_PASSWORD = "1106";
-        let headerClickCount = 0, headerClickTimer = null, isSecretUnlocked = false;
-        function triggerSecretTabs() {
-            headerClickCount++;
-            clearTimeout(headerClickTimer);
-            headerClickTimer = setTimeout(() => { headerClickCount = 0; }, 1000);
-            if (headerClickCount >= 3) {
-                if (isSecretUnlocked) {
-                    isSecretUnlocked = false;
-                    document.getElementById('btn-plan').style.display = 'none';
-                    document.getElementById('btn-memo').style.display = 'none';
-                    switchTab('track');
-                } else {
-                    document.getElementById('secret-pwd-modal').style.display = 'flex';
-                    document.getElementById('global-pwd-input').value = '';
-                }
-                headerClickCount = 0;
-            }
-        }
-        function checkGlobalPassword() {
-            if (document.getElementById('global-pwd-input').value === SECRET_PASSWORD) {
-                isSecretUnlocked = true;
-                document.getElementById('btn-plan').style.display = '';
-                document.getElementById('btn-memo').style.display = '';
-                document.getElementById('secret-pwd-modal').style.display = 'none';
-            } else {
-                alert('비밀번호가 일치하지 않습니다.');
-            }
         }
 
         // ---------------- 로그인 ----------------
