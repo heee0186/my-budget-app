@@ -545,6 +545,18 @@
         // ----------------------------------------
         let appStarted = false;
 
+        function loginErrorText(error) {
+          const code = error && (error.code || '');
+          const msg = (error && error.message) || '';
+          if (code === 'invalid_credentials' || /Invalid login credentials/i.test(msg))
+            return '이메일 또는 비밀번호가 맞지 않아요.\n(계정은 프로젝트 2 wlrenrjgwqefumsenihc 쪽 계정이어야 해요)';
+          if (code === 'email_not_confirmed' || /not confirmed/i.test(msg))
+            return '이메일 확인이 안 된 계정이에요.\nSupabase → Authentication → Users 에서 계정을 Confirm 해 주세요.';
+          if (/api key|apikey|jwt/i.test(msg))
+            return '앱의 Supabase 키가 맞지 않아요. [' + msg + ']';
+          return '로그인하지 못했어요. [' + (code ? code + ': ' : '') + msg + ']';
+        }
+
         async function checkBudgetOwner() {
             const { data, error } = await supabaseClient.rpc('is_owner');
             if (error) {
@@ -593,7 +605,7 @@
             btn.disabled = true; btn.textContent = '확인 중…'; errEl.textContent = '';
             try {
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) return showAuthGate('이메일 또는 비밀번호가 맞지 않아요.');
+                if (error) { console.error('로그인 오류', error); return showAuthGate(loginErrorText(error)); }
                 if (!(await checkBudgetOwner())) {
                     await supabaseClient.auth.signOut();
                     return showAuthGate('이 계정은 가계부를 볼 권한이 없어요.');
@@ -602,7 +614,7 @@
                 enterApp();
             } catch (err) {
                 console.error('로그인 실패', err);
-                showAuthGate('로그인 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+                showAuthGate('로그인 중 문제가 생겼어요. [' + ((err && (err.code ? err.code + ': ' : '') + (err.message || err)) || '') + ']');
             }
         }
 
