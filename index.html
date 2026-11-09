@@ -53,19 +53,21 @@
   .unset { font-size: 17px; font-weight: 600; color: var(--ink-2); margin: 6px 0 10px; }
   .bar { position: relative; height: 12px; border-radius: 6px; background: var(--track); overflow: hidden; display: flex; }
   .bar i { display: block; height: 100%; }
+  .bar .tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
   .row-meta { margin-top: 9px; display: flex; gap: 14px; font-size: 13px; color: var(--ink-2); }
   .row-meta b { color: var(--ink); font-weight: 600; }
 
   /* 곧 빠져나갈 돈 */
-  .soon { margin-top: 30px; }
-  .soon h2 { margin: 0; font-size: 17px; font-weight: 700; }
-  .soon .lead { margin: 4px 0 12px; color: var(--ink-2); font-size: 14px; }
-  .soon ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
-  .soon li { display: grid; grid-template-columns: 52px 1fr auto; gap: 8px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--rule); font-size: 15px; }
-  .soon li .d { color: var(--ink-2); font-size: 13px; }
-  .soon li .acct { display: block; color: var(--ink-3); font-size: 12px; }
-  .soon li .v { font-weight: 600; }
-  .soon .total { display: flex; justify-content: space-between; padding: 12px 0 0; font-weight: 700; font-size: 16px; }
+  .soon { display: flex; width: 100%; align-items: center; gap: 12px; margin: 0 0 26px; padding: 14px 16px; border-radius: 14px; background: var(--ink); color: #fff; text-align: left; }
+  .soon .k { font-size: 14px; font-weight: 600; }
+  .soon .when { font-size: 12.5px; color: #b9bbc0; }
+  .soon .v { margin-left: auto; font-size: 18px; font-weight: 700; }
+  .soon .chev { color: #8d9096; font-size: 18px; }
+  .pay-list { list-style: none; margin: 18px 0 0; padding: 0; border-top: 1px solid var(--rule); }
+  .pay-list li { display: grid; grid-template-columns: 44px 1fr auto; gap: 8px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .pay-list .d { color: var(--ink-2); font-size: 13px; }
+  .pay-list .acct { display: block; color: var(--ink-3); font-size: 12px; }
+  .pay-list .v { font-weight: 600; }
 
   .collector { margin-top: 30px; font-size: 12.5px; color: var(--ink-3); }
   .logout { margin-top: 8px; font-size: 12.5px; color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; }
@@ -141,11 +143,12 @@
 </section>
 
 <main id="app" class="wrap">
+  <button class="soon" id="soon" onclick="openSoon()" hidden></button>
   <header class="head">
     <div>
-      <h1 id="title">지금 쓰는 돈</h1>
+      <h1 id="title">다음 결제</h1>
       <p class="lead" id="lead"></p>
-      <button class="back-now" id="back-now" onclick="goCurrent()" hidden>지금으로 돌아가기</button>
+      <button class="back-now" id="back-now" onclick="goCurrent()" hidden>다음 결제로 돌아가기</button>
     </div>
     <div class="months">
       <button onclick="moveMonth(-1)" aria-label="이전 달">‹</button>
@@ -157,7 +160,6 @@
 
   <section class="cards" id="cards" aria-label="카드별 남은 예산"></section>
 
-  <section class="soon" id="soon" hidden></section>
 
   <p class="collector" id="collector"></p>
   <button class="logout" onclick="openLogout()">로그아웃</button>
@@ -314,14 +316,14 @@ function render() {
   const sal = salaryDate(viewBM);
   const title = document.getElementById('title'), lead = document.getElementById('lead');
   if (viewBM === cur) {
-    title.textContent = '지금 쓰는 돈';
-    lead.textContent = `${mdKo(sal)}(${dow(sal)}) 급여로 갚을 카드값이에요.`;
+    title.textContent = '다음 결제';
+    lead.textContent = `${mdKo(sal)}(${dow(sal)}) 급여로 18·20일에 내요.`;
   } else if (viewBM < cur) {
-    title.textContent = `${M(viewBM)}월 급여로 갚은 돈`;
+    title.textContent = `${M(viewBM)}월 결제`;
     lead.textContent = today() > payDate('lotte', viewBM) ? `${M(viewBM)}월 18일과 20일에 빠져나갔어요.` : `${M(viewBM)}월 18일과 20일에 빠져나가요.`;
   } else {
-    title.textContent = `${M(viewBM)}월 급여로 갚을 돈`;
-    lead.textContent = '지금까지 잡힌 할부예요.';
+    title.textContent = `${M(viewBM)}월 결제`;
+    lead.textContent = `${mdKo(sal)}(${dow(sal)}) 급여로 낼 돈이에요. 지금은 할부만 잡혀 있어요.`;
   }
   document.getElementById('back-now').hidden = viewBM === cur;
 
@@ -332,12 +334,12 @@ function render() {
 
 function barHtml(id, m) {
   const scale = Math.max(m.budget, m.total, 1);
-  if (m.budget && m.left < 0) {
-    // 초과: 끝까지 찬 막대에 사선 무늬
-    return `<div class="bar" aria-hidden="true"><i style="width:100%;background:repeating-linear-gradient(-45deg, ${BRAND[id]} 0 6px, ${tint(id, 55)} 6px 11px)"></i></div>`;
-  }
   const iw = m.inst / scale * 100, uw = Math.max(0, m.used) / scale * 100;
-  return `<div class="bar" aria-hidden="true"><i style="width:${iw}%;background:${tint(id, 38)}"></i><i style="width:${uw}%;background:${BRAND[id]}"></i></div>`;
+  const over = m.budget && m.left < 0;
+  // 예산을 넘으면 쓴 돈 부분만 사선 무늬, 예산이 끝나는 자리에 눈금
+  const used = over ? `repeating-linear-gradient(-45deg, ${BRAND[id]} 0 5px, ${tint(id, 45)} 5px 10px)` : BRAND[id];
+  const tick = over ? `<b class="tick" style="left:${m.budget / scale * 100}%"></b>` : '';
+  return `<div class="bar" aria-hidden="true"><i style="width:${iw}%;background:${tint(id, 38)}"></i><i style="width:${uw}%;background:${used}"></i>${tick}</div>`;
 }
 
 function whenText(c) {
@@ -365,23 +367,34 @@ function rowHtml(c, m) {
   </button>`;
 }
 
-// 이번 급여가 들어오면 바로 나갈 카드값 (결제일이 지나면 사라져요)
-function renderSoon(cur) {
-  const box = document.getElementById('soon');
-  const prev = addMonths(cur, -1);
+// 이번 결제: 이번 급여로 18·20일에 나갈 카드값 (마지막 결제일이 지나면 사라져요)
+function soonData() {
+  const cur = currentBillMonth(), prev = addMonths(cur, -1);
   const lastPay = CARDS.reduce((a, c) => (payDate(c.id, prev) > a ? payDate(c.id, prev) : a), '');
-  if (viewBM !== cur || today() > lastPay) { box.hidden = true; return; }
+  if (today() > lastPay) return null;
   const items = CARDS.map(c => ({ c, v: monthOf(c.id, prev).total }))
     .filter(x => x.v !== 0)
     .sort((a, b) => a.c.pay_day - b.c.pay_day || a.c.sort - b.c.sort);
-  if (!items.length) { box.hidden = true; return; }
-  const sal = salaryDate(prev);
-  const total = items.reduce((a, x) => a + x.v, 0);
+  if (!items.length) return null;
+  return { bm: prev, items, total: items.reduce((a, x) => a + x.v, 0) };
+}
+function renderSoon(cur) {
+  const box = document.getElementById('soon'), d = soonData();
+  if (viewBM !== cur || !d) { box.hidden = true; return; }
   box.hidden = false;
-  box.innerHTML = `<h2>곧 빠져나갈 돈</h2>
+  const days = [...new Set(d.items.map(x => x.c.pay_day))].sort((a, b) => a - b).join('·');
+  box.innerHTML = `<span><span class="k">이번 결제</span><br><span class="when">${M(d.bm)}월 ${days}일</span></span><span class="v num">${won(d.total)}</span><span class="chev" aria-hidden="true">›</span>`;
+}
+function openSoon() {
+  const d = soonData(); if (!d) return;
+  const sal = salaryDate(d.bm);
+  openSheet(`
+    <h3 id="sheet-title" tabindex="-1">이번 결제</h3>
     <p class="lead">${mdKo(sal)}(${dow(sal)}) 급여가 들어오면 바로 나가요.</p>
-    <ul>${items.map(x => `<li><span class="d">${x.c.pay_day}일</span><span>${esc(x.c.name)}<span class="acct">${esc(x.c.account || '')}</span></span><span class="v num">${won(x.v)}</span></li>`).join('')}</ul>
-    <div class="total num"><span>합계</span><span>${won(total)}</span></div>`;
+    <div class="sheet-amount num">${won(d.total)}</div>
+    <ul class="pay-list">${d.items.map(x => `<li><span class="d">${x.c.pay_day}일</span><span>${esc(x.c.name)}<span class="acct">${esc(x.c.account || '')}</span></span><span class="v num">${won(x.v)}</span></li>`).join('')}</ul>
+    <button class="btn quiet" onclick="closeSheet(); viewBM = ${d.bm}; render(); load();">내역 자세히 보기</button>
+  `);
 }
 
 function ago(ts) {
@@ -548,7 +561,7 @@ async function addPayment() {
   if (error) { console.error(error); err.textContent = '기록하지 못했어요. 다시 눌러 주세요.'; return; }
   closeSheet();
   const bm = billMonthOf(addCardId, date);
-  toast(bm === currentBillMonth() ? '기록했어요' : `${M(bm)}월 급여로 갚을 돈에 기록했어요`);
+  toast(bm === currentBillMonth() ? '기록했어요' : `${M(bm)}월 결제에 기록했어요`);
   load();
 }
 
