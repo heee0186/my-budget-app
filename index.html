@@ -21,6 +21,7 @@
     --lotte: #da291c; --nh: #00965e; --samsung: #1a3fa6;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; background: var(--paper); color: var(--ink); }
   body { font-family: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
   .num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
@@ -73,6 +74,37 @@
   .review-btn::after { content: '›'; float: right; color: var(--ink-2); }
   .collector { margin-top: 30px; font-size: 12.5px; color: var(--ink-3); }
   .logout { margin-top: 8px; font-size: 12.5px; color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* 탭 */
+  .tabs { display: flex; gap: 18px; margin: -8px 0 18px; }
+  .tabs button { font-size: 15px; font-weight: 600; color: var(--ink-3); padding: 6px 0; border-bottom: 2px solid transparent; }
+  .tabs button[aria-current="page"] { color: var(--ink); border-color: var(--ink); }
+  .banner { display: block; width: 100%; text-align: left; margin: 0 0 16px; padding: 13px 16px; border-radius: 14px; border: 1.5px solid var(--ink); background: #fff; font-size: 14px; }
+  .banner b { display: block; font-size: 15px; }
+  .banner::after { content: '›'; float: right; margin-top: -30px; color: var(--ink-2); font-size: 18px; }
+
+  /* 계획 */
+  .plan { margin-top: 22px; border-top: 1.5px solid var(--ink); }
+  .pl { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; width: 100%; text-align: left; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+  .pl .n { font-size: 15px; font-weight: 600; }
+  .pl .v { font-size: 16px; font-weight: 600; }
+  .pl .s { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-2); }
+  .pl .s.flag { color: #b26a00; }
+  .pl.child { padding: 11px 0 11px 14px; }
+  .pl.child .n { font-weight: 500; }
+  .pl.child .v { font-weight: 500; font-size: 15px; }
+  .pl-h { display: flex; justify-content: space-between; align-items: baseline; padding: 22px 0 8px; border-bottom: 1px solid var(--rule); }
+  .pl-h strong { font-size: 16px; }
+  .pl-h span { font-size: 15px; font-weight: 600; color: var(--ink-2); }
+  .pl-sum { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 0; border-bottom: 1.5px solid var(--ink); }
+  .pl-sum strong { font-size: 16px; }
+  .pl-sum span { font-size: 22px; font-weight: 700; }
+  .tip { margin-top: 18px; padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid var(--rule); font-size: 14px; color: var(--ink-2); }
+  .tip b { display: block; color: var(--ink); font-size: 15px; margin-bottom: 2px; }
+  .chip { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--track); color: var(--ink-2); margin-left: 6px; vertical-align: 1px; }
+  .pick.five { grid-template-columns: repeat(5, 1fr); }
+  .pick.five button { font-size: 13px; padding: 0 2px; }
+  .pick button.sel { background: var(--ink); border-color: var(--ink); color: #fff; }
 
   /* 아래 고정 버튼 */
   .dock { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 20px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--paper) 70%, rgba(245,245,242,0)); }
@@ -145,6 +177,11 @@
 </section>
 
 <main id="app" class="wrap">
+  <nav class="tabs" aria-label="화면">
+    <button id="tab-spend" aria-current="page" onclick="setTab('spend')">지출</button>
+    <button id="tab-plan" onclick="setTab('plan')">계획</button>
+  </nav>
+  <button class="banner" id="payslip" onclick="openSalary(salaryBillMonth())" hidden></button>
   <button class="soon" id="soon" onclick="openSoon()" hidden></button>
   <header class="head">
     <div>
@@ -161,6 +198,7 @@
   <div class="alert" id="alert" hidden></div>
 
   <section class="cards" id="cards" aria-label="카드별 남은 예산"></section>
+  <section class="plan" id="plan" aria-label="급여 계획" hidden></section>
 
 
   <button class="review-btn" id="review-btn" onclick="openReviews()" hidden></button>
@@ -300,9 +338,12 @@ async function load() {
     }
     const b = await db.from('budgets').select('*');
     if (b.error) throw b.error;
+    const sa = await db.from('salaries').select('*');
+    const it = await db.from('plan_items').select('*').order('sort').order('id');
     const s = await db.rpc('collector_status');
     if (seq !== loadSeq) return;
     payments = all; budgets = b.data; status = s.data && s.data[0] ? s.data[0] : null;
+    salaries = sa.error ? [] : sa.data; items = it.error ? [] : it.data;
   } catch (e) {
     console.error(e);
     if (seq === loadSeq) toast('자료를 불러오지 못했어요. 인터넷 연결을 확인해 주세요');
@@ -329,9 +370,18 @@ function render() {
     lead.textContent = `${mdKo(sal)}(${dow(sal)}) 급여로 낼 돈이에요. 지금은 할부만 잡혀 있어요.`;
   }
   document.getElementById('back-now').hidden = viewBM === cur;
+  if (tab === 'plan') {
+    title.textContent = `${M(viewBM)}월 급여 계획`;
+    lead.textContent = `${mdKo(sal)}(${dow(sal)}) 급여로 ${M(viewBM)}월 카드값을 내요.`;
+  }
+  document.getElementById('cards').hidden = tab !== 'spend';
+  document.getElementById('plan').hidden = tab !== 'plan';
 
   document.getElementById('cards').innerHTML = CARDS.map(c => rowHtml(c, monthOf(c.id, viewBM))).join('');
+  renderPlan();
   renderSoon(cur);
+  if (tab !== 'spend') document.getElementById('soon').hidden = true;
+  renderPayslip();
   renderCollector();
 }
 
@@ -396,6 +446,13 @@ function openSoon() {
     <p class="lead">${mdKo(sal)}(${dow(sal)}) 급여가 들어오면 바로 나가요.</p>
     <div class="sheet-amount num">${won(d.total)}</div>
     <ul class="pay-list">${d.items.map(x => `<li><span class="d">${x.c.pay_day}일</span><span>${esc(x.c.name)}<span class="acct">${esc(x.c.account || '')}</span></span><span class="v num">${won(x.v)}</span></li>`).join('')}</ul>
+    ${(() => { const p = planOf(d.bm); if (!p.sal.amount) return ''; const left = p.sal.amount - p.setAside - d.total;
+      return `<ul class="pay-list" style="margin-top:22px">
+        <li><span class="d"></span><span>급여</span><span class="v num">${won(p.sal.amount)}</span></li>
+        <li><span class="d"></span><span>먼저 빼둘 돈</span><span class="v num">−${won(p.setAside)}</span></li>
+        <li><span class="d"></span><span>카드값</span><span class="v num">−${won(d.total)}</span></li>
+        <li><span class="d"></span><span><b>남는 돈</b></span><span class="v num"><b>${won(left)}</b></span></li></ul>
+        ${left > 0 ? `<p class="hint">${won(left)}은 추가로 저축할 수 있어요.</p>` : `<p class="hint">${won(-left)} 모자라요. 다음 달 예산을 조금 줄여 보세요.</p>`}`; })()}
     <button class="btn quiet" onclick="closeSheet(); viewBM = ${d.bm}; render(); load();">내역 자세히 보기</button>
   `);
 }
@@ -630,6 +687,254 @@ function openLogout() {
     <button class="btn" onclick="db.auth.signOut();closeSheet()">로그아웃</button>
     <button class="btn quiet" onclick="closeSheet()">취소</button>
   `);
+}
+
+// ---------------------------------------------------------------------
+// 계획: 급여 − 먼저 빼둘 돈 = 카드에 쓸 수 있는 돈 → 카드별 예산
+// ---------------------------------------------------------------------
+let tab = 'spend';
+let salaries = [];
+let items = [];
+const KINDS = {
+  saving: { name: '적금·투자', unit: '매달' },
+  fixed: { name: '고정비', unit: '매달' },
+  subscription: { name: '구독', unit: '내 몫' },
+  sinking: { name: '목돈 모으기', unit: '매달' }
+};
+const METHODS = ['계좌', '카카오뱅크', '롯데', '농협', '삼성'];
+const CARD_METHOD = { '롯데': 'lotte', '농협': 'nh', '삼성': 'samsung' };
+const SUB_TARGET = '카카오뱅크';   // 구독을 모으려는 곳
+
+function setTab(t) {
+  tab = t;
+  ['spend', 'plan'].forEach(k => {
+    const b = document.getElementById('tab-' + k);
+    if (k === t) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  render();
+}
+
+// 급여: 그 달 값이 없으면 바로 전 달 값
+function salaryFor(bm) {
+  const exact = salaries.find(r => r.bill_month === bm);
+  if (exact) return { amount: exact.amount, confirmed: !!exact.confirmed_at, carried: false };
+  const prev = salaries.filter(r => r.bill_month < bm).sort((a, b) => b.bill_month - a.bill_month)[0];
+  return { amount: prev ? prev.amount : 0, confirmed: false, carried: !!prev };
+}
+// 다음에 들어올 급여의 청구월
+function salaryBillMonth() {
+  const t = today(), bm = Number(t.slice(0, 4)) * 100 + Number(t.slice(5, 7));
+  return t <= salaryDate(bm) ? bm : addMonths(bm, 1);
+}
+
+const itemActive = (i, bm) => (!i.start_month || i.start_month <= bm) && (!i.end_month || i.end_month >= bm);
+const deducts = i => i.kind === 'sinking' || !CARD_METHOD[i.method];   // 카드로 나가면 이미 카드값에 들어 있어요
+function monthsBetween(a, b) { return (Y(b) - Y(a)) * 12 + (M(b) - M(a)) + 1; }
+function monthlyOf(i) {
+  if (i.kind !== 'sinking') return i.amount;
+  const n = Math.max(1, monthsBetween(i.start_month || viewBM, i.end_month || viewBM));
+  return Math.ceil((i.total || 0) / n / 1000) * 1000;
+}
+
+function planOf(bm) {
+  const sal = salaryFor(bm);
+  const act = items.filter(i => itemActive(i, bm));
+  const groups = {};
+  Object.keys(KINDS).forEach(k => {
+    const list = act.filter(i => i.kind === k);
+    groups[k] = {
+      list,
+      sum: list.filter(deducts).reduce((a, i) => a + monthlyOf(i), 0),
+      onCard: list.filter(i => !deducts(i)),
+      toMove: k === 'subscription' ? list.filter(i => i.method !== SUB_TARGET) : []
+    };
+  });
+  const setAside = Object.values(groups).reduce((a, g) => a + g.sum, 0);
+  const available = sal.amount - setAside;
+  const cards = CARDS.map(c => ({ c, m: monthOf(c.id, bm) }));
+  const budgetSum = cards.reduce((a, x) => a + x.m.budget, 0);
+  const closed = CARDS.every(c => today() > cycleOf(c.id, bm).end);
+  const actual = cards.reduce((a, x) => a + x.m.total, 0);
+  return { sal, groups, setAside, available, cards, budgetSum, closed, actual };
+}
+
+function renderPlan() {
+  const box = document.getElementById('plan');
+  if (tab !== 'plan') { box.innerHTML = ''; return; }
+  const p = planOf(viewBM);
+  const salTag = p.sal.confirmed ? '<span class="chip">확인함</span>' : p.sal.carried ? '<span class="chip">지난달 금액</span>' : '';
+  let html = `<button class="pl" onclick="openSalary(${viewBM})"><span class="n">급여${salTag}</span><span class="v num">${p.sal.amount ? won(p.sal.amount) : '적기'}</span></button>`;
+
+  html += `<div class="pl-h"><strong>먼저 빼둘 돈</strong><span class="num">−${won(p.setAside)}</span></div>`;
+  Object.entries(KINDS).forEach(([k, meta]) => {
+    const g = p.groups[k];
+    const notes = [];
+    if (g.list.length) notes.push(`${g.list.length}개`);
+    if (g.onCard.length) notes.push(`카드로 나가는 ${g.onCard.length}개는 카드값에 포함`);
+    if (k === 'sinking' && g.list.length) notes.push(g.list.map(i => `${i.name} ${M(i.end_month)}월까지 ${won(i.total)}`).join(', '));
+    const flag = g.toMove.length ? `<span class="s flag">${SUB_TARGET}로 옮길 구독 ${g.toMove.length}개</span>` : '';
+    html += `<button class="pl child" onclick="openGroup('${k}')">
+      <span class="n">${meta.name}</span><span class="v num">${g.list.length ? won(g.sum) : '추가하기'}</span>
+      ${notes.length ? `<span class="s">${esc(notes.join(' · '))}</span>` : ''}${flag}
+    </button>`;
+  });
+  html += `<div class="pl-sum"><strong>카드에 쓸 수 있는 돈</strong><span class="num">${won(p.available)}</span></div>`;
+
+  html += `<div class="pl-h"><strong>카드 예산</strong><span class="num">${won(p.budgetSum)}</span></div>`;
+  p.cards.forEach(({ c, m }) => {
+    html += `<button class="pl child" onclick="openCard('${c.id}')">
+      <span class="n" style="color:${BRAND[c.id]}">${esc(c.name)}</span><span class="v num">${m.budget ? won(m.budget) : '정하기'}</span>
+      <span class="s">${m.inst ? `할부 ${won(m.inst)} 포함 · ` : ''}지금까지 ${won(m.total)}</span>
+    </button>`;
+  });
+
+  const plannedLeft = p.available - p.budgetSum;
+  const realLeft = p.available - p.actual;
+  html += `<div class="pl-sum"><strong>${p.closed ? '실제로 남는 돈' : '예산대로 쓰면 남는 돈'}</strong><span class="num">${won(p.closed ? realLeft : plannedLeft)}</span></div>`;
+  let tip;
+  if (!p.sal.amount) tip = ['급여부터 적어 주세요', '급여를 적으면 카드에 쓸 수 있는 돈을 계산해요.'];
+  else if (!p.closed && plannedLeft < 0) tip = [`카드 예산이 ${won(-plannedLeft)} 많아요`, '카드 예산을 줄이거나 빼둘 돈을 다시 봐 주세요.'];
+  else if (p.closed && realLeft > 0) tip = [`${won(realLeft)} 추가 저축할 수 있어요`, `카드값이 확정됐어요. ${mdKo(salaryDate(viewBM))} 급여에서 이만큼 더 모아 보세요.`];
+  else if (p.closed && realLeft < 0) tip = [`${won(-realLeft)} 모자라요`, '카드값이 쓸 수 있는 돈보다 많아요. 다음 달 예산을 조금 줄여 보세요.'];
+  else if (plannedLeft > 0) tip = [`예산대로 쓰면 ${won(plannedLeft)} 더 모을 수 있어요`, '카드값이 확정되면 실제로 남는 돈을 알려 드려요.'];
+  if (tip) html += `<div class="tip"><b>${tip[0]}</b>${tip[1]}</div>`;
+  box.innerHTML = html;
+}
+
+// 급여명세서 알림이 오면 확인 요청
+function renderPayslip() {
+  const el = document.getElementById('payslip');
+  const last = status && status.last_payslip;
+  const bm = salaryBillMonth();
+  const row = salaries.find(r => r.bill_month === bm);
+  const need = last && (!row || !row.confirmed_at || new Date(row.confirmed_at) < new Date(last));
+  el.hidden = !need || tab !== 'spend';
+  if (need) el.innerHTML = `<b>급여명세서가 왔어요</b>${M(bm)}월 급여 금액을 확인해 주세요.`;
+}
+
+function openSalary(bm) {
+  const s = salaryFor(bm), sal = salaryDate(bm);
+  openSheet(`
+    <h3 id="sheet-title" tabindex="-1">${M(bm)}월 급여</h3>
+    <p class="lead">${mdKo(sal)}(${dow(sal)})에 들어오는 실수령액이에요.</p>
+    <label class="label" for="salary-input">실수령액</label>
+    ${moneyInput('salary-input', s.amount ? comma(s.amount) : '')}
+    <p class="hint">택사스 급여명세서의 실지급액을 적어 주세요. 다음 달에도 이 금액으로 이어져요.</p>
+    <div class="err" id="salary-err"></div>
+    <button class="btn" onclick="saveSalary(${bm})">이 금액으로 확인</button>
+  `, '#salary-input');
+}
+async function saveSalary(bm) {
+  const amount = num(document.getElementById('salary-input').value);
+  if (amount <= 0) { document.getElementById('salary-err').textContent = '급여를 적어 주세요.'; return; }
+  const row = { bill_month: bm, amount, confirmed_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const { error } = await db.from('salaries').upsert(row);
+  if (error) { console.error(error); document.getElementById('salary-err').textContent = '저장하지 못했어요. 다시 눌러 주세요.'; return; }
+  salaries = salaries.filter(r => r.bill_month !== bm).concat(row);
+  closeSheet(); render(); toast(`${M(bm)}월 급여를 확인했어요`);
+}
+
+// 항목 묶음 (적금, 고정비, 구독, 목돈)
+function openGroup(kind) {
+  const meta = KINDS[kind];
+  const list = items.filter(i => i.kind === kind && itemActive(i, viewBM));
+  const rows = list.map(i => {
+    const sub = kind === 'sinking'
+      ? `${M(i.end_month)}월까지 ${won(i.total)} · 매달 ${won(monthlyOf(i))}`
+      : [i.pay_day ? `${i.pay_day}일` : '', i.method, kind === 'subscription' && i.total && i.total !== i.amount ? `전체 ${won(i.total)}` : '', !deducts(i) ? '카드값에 포함' : ''].filter(Boolean).join(' · ');
+    const flag = kind === 'subscription' && i.method !== SUB_TARGET;
+    return `<button class="item" style="grid-template-columns:1fr auto" onclick="openItemEdit('${kind}', ${i.id})">
+      <span class="t"><span>${esc(i.name)}</span><em ${flag ? 'style="color:#b26a00"' : ''}>${esc(sub)}${flag ? ` · ${SUB_TARGET}로 옮기기` : ''}</em></span>
+      <span class="v num" ${deducts(i) ? '' : 'style="color:var(--ink-3)"'}>${won(monthlyOf(i))}</span>
+    </button>`;
+  }).join('');
+  const lead = {
+    saving: '급여가 들어오면 먼저 옮겨 두는 돈이에요.',
+    fixed: '보험, 통신비, 계처럼 매달 나가는 돈이에요. 카드로 나가는 건 카드값에 이미 들어 있어서 빼지 않아요.',
+    subscription: `같이 쓰는 구독은 내 몫만 적어요. ${SUB_TARGET} 체크카드로 모으는 중이에요.`,
+    sinking: '여행처럼 큰돈이 나갈 일을 목표 금액과 달로 적으면, 매달 얼마씩 모을지 나눠 드려요.'
+  }[kind];
+  openSheet(`
+    <h3 id="sheet-title" tabindex="-1">${meta.name}</h3>
+    <p class="lead">${lead}</p>
+    <div class="items">${rows || '<div class="items-empty">아직 없어요</div>'}</div>
+    <button class="btn" onclick="openItemEdit('${kind}', null)">추가하기</button>
+  `);
+}
+
+let editMethod = '계좌';
+function methodPick() {
+  return METHODS.map(m => `<button type="button" class="${m === editMethod ? 'sel' : ''}" onclick="editMethod='${m}';document.getElementById('method-pick').innerHTML=methodPick()">${m}</button>`).join('');
+}
+function monthOptions(sel) {
+  let o = '';
+  for (let k = 0; k < 24; k++) { const bm = addMonths(viewBM, k); o += `<option value="${bm}" ${bm === sel ? 'selected' : ''}>${Y(bm)}년 ${M(bm)}월</option>`; }
+  return o;
+}
+function openItemEdit(kind, id) {
+  const i = id ? items.find(x => x.id === id) : null;
+  editMethod = i ? i.method : (kind === 'subscription' ? SUB_TARGET : '계좌');
+  const meta = KINDS[kind];
+  let fields;
+  if (kind === 'sinking') {
+    fields = `
+      <label class="label" for="it-total">목표 금액</label>${moneyInput('it-total', i && i.total ? comma(i.total) : '')}
+      <label class="label" for="it-end">쓰는 달</label>
+      <select class="input" id="it-end">${monthOptions(i ? i.end_month : addMonths(viewBM, 3))}</select>
+      <p class="hint">${M(viewBM)}월부터 쓰는 달까지 똑같이 나눠서 모아요.</p>`;
+  } else {
+    fields = `
+      ${kind === 'subscription' ? `<label class="label" for="it-total">전체 금액</label>${moneyInput('it-total', i && i.total ? comma(i.total) : '')}` : ''}
+      <label class="label" for="it-amount">${kind === 'subscription' ? '내 몫' : '매달 금액'}</label>${moneyInput('it-amount', i ? comma(i.amount) : '')}
+      ${kind === 'subscription' ? '<p class="hint">혼자 쓰면 전체 금액과 같게 적어요.</p>' : ''}
+      <div class="split">
+        <div><label class="label" for="it-day">나가는 날</label><input class="input" id="it-day" inputmode="numeric" placeholder="25" value="${i && i.pay_day ? i.pay_day : ''}" style="font-size:16px"></div>
+        <div></div>
+      </div>
+      <span class="label">어디서 나가요</span>
+      <div class="pick five" id="method-pick">${methodPick()}</div>`;
+  }
+  openSheet(`
+    <h3 id="sheet-title" tabindex="-1">${i ? esc(i.name) : meta.name + ' 추가'}</h3>
+    <label class="label" for="it-name">이름</label>
+    <input class="input" id="it-name" value="${i ? esc(i.name) : ''}" placeholder="${{ saving: '청년도약계좌', fixed: '실비보험', subscription: '넷플릭스', sinking: '3월 여행' }[kind]}">
+    ${fields}
+    <div class="err" id="it-err"></div>
+    <button class="btn" onclick="saveItem('${kind}', ${id || 'null'})">저장</button>
+    ${i ? `<button class="btn quiet" onclick="removeItem(${i.id}, this)">${M(viewBM)}월부터 빼기</button>` : ''}
+  `, i ? null : '#it-name');
+}
+async function saveItem(kind, id) {
+  const err = document.getElementById('it-err');
+  const name = document.getElementById('it-name').value.trim();
+  if (!name) { err.textContent = '이름을 적어 주세요.'; return; }
+  const row = { kind, name };
+  if (kind === 'sinking') {
+    row.total = num(document.getElementById('it-total').value);
+    row.end_month = Number(document.getElementById('it-end').value);
+    row.amount = 0; row.method = '계좌';
+    if (row.total <= 0) { err.textContent = '목표 금액을 적어 주세요.'; return; }
+  } else {
+    row.amount = num(document.getElementById('it-amount').value);
+    row.total = kind === 'subscription' ? (num(document.getElementById('it-total').value) || row.amount) : null;
+    row.pay_day = parseInt(document.getElementById('it-day').value, 10) || null;
+    row.method = editMethod;
+    if (row.amount <= 0) { err.textContent = '금액을 적어 주세요.'; return; }
+  }
+  let res;
+  if (id) res = await db.from('plan_items').update(row).eq('id', id);
+  else { row.start_month = viewBM; row.sort = items.length + 1; res = await db.from('plan_items').insert(row); }
+  if (res.error) { console.error(res.error); err.textContent = '저장하지 못했어요. 다시 눌러 주세요.'; return; }
+  closeSheet(); toast('저장했어요'); load();
+}
+async function removeItem(id, btn) {
+  if (!btn.dataset.armed) { btn.dataset.armed = '1'; btn.textContent = '한 번 더 누르면 빠져요'; btn.classList.remove('quiet'); btn.classList.add('danger'); return; }
+  const i = items.find(x => x.id === id);
+  const res = i && i.start_month && i.start_month >= viewBM
+    ? await db.from('plan_items').delete().eq('id', id)                       // 이번 달에 만든 건 그냥 지워요
+    : await db.from('plan_items').update({ end_month: addMonths(viewBM, -1) }).eq('id', id);   // 지난달까지는 기록으로 남겨요
+  if (res.error) { document.getElementById('it-err').textContent = '빼지 못했어요. 다시 눌러 주세요.'; return; }
+  closeSheet(); toast('뺐어요'); load();
 }
 
 function moveMonth(n) { viewBM = addMonths(viewBM, n); render(); load(); }
