@@ -69,6 +69,8 @@
   .pay-list .acct { display: block; color: var(--ink-3); font-size: 12px; }
   .pay-list .v { font-weight: 600; }
 
+  .review-btn { display: block; width: 100%; margin-top: 26px; padding: 14px 16px; border-radius: 12px; border: 1.5px solid var(--ink); text-align: left; font-weight: 600; }
+  .review-btn::after { content: '›'; float: right; color: var(--ink-2); }
   .collector { margin-top: 30px; font-size: 12.5px; color: var(--ink-3); }
   .logout { margin-top: 8px; font-size: 12.5px; color: var(--ink-3); text-decoration: underline; text-underline-offset: 3px; }
 
@@ -161,6 +163,7 @@
   <section class="cards" id="cards" aria-label="카드별 남은 예산"></section>
 
 
+  <button class="review-btn" id="review-btn" onclick="openReviews()" hidden></button>
   <p class="collector" id="collector"></p>
   <button class="logout" onclick="openLogout()">로그아웃</button>
 </main>
@@ -403,13 +406,66 @@ function ago(ts) {
   if (h < 24) return `${Math.round(h)}시간 전`;
   return `${Math.floor(h / 24)}일 전`;
 }
+const hoursSince = ts => ts ? (Date.now() - new Date(ts).getTime()) / 36e5 : Infinity;
 function renderCollector() {
   const alert = document.getElementById('alert'), line = document.getElementById('collector');
-  const last = status && status.last_any;
-  const stale = !last || (Date.now() - new Date(last).getTime()) / 36e5 > 36;
-  alert.hidden = !stale;
-  if (stale) alert.innerHTML = `<b>${last ? `결제 알림이 ${ago(last)}부터 안 들어와요` : '아직 받은 알림이 없어요'}</b>폰의 수집기 앱을 확인해 주세요. 그동안 쓴 건 아래 버튼으로 기록할 수 있어요.`;
-  line.textContent = last ? `폰 알림 수집 · 마지막 알림 ${ago(last)}` : '폰 알림 수집 · 받은 알림 없음';
+  const st = status || {};
+  let warn = null;
+  if (!st.sent_at) warn = ['새 수집기를 아직 설치하지 않았어요', '폰에 가계부 수집기를 설치하면 카드 결제가 자동으로 기록돼요.'];
+  else if (st.listener_enabled === false) warn = ['폰에서 알림 읽기 권한이 꺼져 있어요', '가계부 수집기 앱을 열고 맨 위 항목을 켜 주세요.'];
+  else if (hoursSince(st.sent_at) > 12) warn = [`수집기가 ${ago(st.sent_at)}부터 응답이 없어요`, '폰에서 가계부 수집기 앱을 한 번 열어 주세요. 꺼져 있었다면 다시 깨어나요.'];
+  else if (hoursSince(st.last_any_notif) > 8) warn = ['수집기가 알림을 못 듣고 있어요', '폰에서 가계부 수집기 앱을 한 번 열어 주세요. 연결을 다시 붙여요.'];
+  else if (st.battery_ok === false) warn = ['배터리 제한을 풀어 주세요', '가계부 수집기 앱에서 "배터리 제한 없음"을 켜 두면 멈추지 않아요.'];
+  alert.hidden = !warn;
+  if (warn) alert.innerHTML = `<b>${warn[0]}</b>${warn[1]} 그동안 쓴 건 아래 버튼으로 기록할 수 있어요.`;
+
+  const review = st.review_count || 0;
+  const reviewBtn = document.getElementById('review-btn');
+  reviewBtn.hidden = !review;
+  reviewBtn.textContent = `확인이 필요한 알림 ${review}건`;
+  line.textContent = st.sent_at
+    ? `수집기 신호 ${ago(st.sent_at)}` + (st.last_card_notif ? ` · 마지막 카드 알림 ${ago(st.last_card_notif)}` : '')
+    : '수집기 신호 없음';
+}
+
+// 자동으로 못 읽은 알림 (해외결제 등)
+let reviews = [];
+async function openReviews() {
+  const { data, error } = await db.from('inbox').select('id, title, text, big_text, posted_at, note, card_id')
+    .eq('kind', 'review').order('id', { ascending: false }).limit(20);
+  if (error) return toast('불러오지 못했어요');
+  reviews = data || [];
+  openSheet(`
+    <h3 id="sheet-title" tabindex="-1">확인이 필요한 알림</h3>
+    <p class="lead">결제 같은데 금액을 읽지 못했어요. 원화 금액을 넣어 기록하거나 넘겨요.</p>
+    <div class="items">${reviews.map(r => `
+      <div class="item" style="grid-template-columns:1fr;gap:6px">
+        <span class="t"><span><b>${esc(r.title || '')}</b> <em>${r.posted_at ? mdKo(kstDate(r.posted_at)) : ''}</em></span>
+          <em style="white-space:normal">${esc((r.big_text || r.text || '').replace(/\n/g, ' / '))}</em>
+          <em style="color:var(--ink-2)">${esc(r.note || '')}</em></span>
+        <span style="display:flex;gap:8px">
+          <button class="btn" style="margin:0;height:40px;font-size:14px" onclick="reviewToAdd(${r.id})">금액 넣어 기록</button>
+          <button class="btn quiet" style="margin:0;height:40px;font-size:14px" onclick="dismissReview(${r.id})">넘기기</button>
+        </span>
+      </div>`).join('') || '<div class="items-empty">없어요</div>'}</div>
+  `);
+}
+let pendingReview = null;
+function reviewToAdd(id) {
+  const r = reviews.find(x => x.id === id); if (!r) return;
+  if (r.card_id) addCardId = r.card_id;
+  openAdd();
+  pendingReview = id;
+  const body = (r.big_text || r.text || '');
+  const m = body.match(/[0-9]{1,2}:[0-9]{2}\s+([^\n]+)/);
+  document.getElementById('add-merchant').value = m ? m[1].trim() : '';
+  if (r.posted_at) document.getElementById('add-date').value = kstDate(r.posted_at);
+}
+async function dismissReview(id) {
+  const { error } = await db.from('inbox').update({ kind: 'dismissed' }).eq('id', id);
+  if (error) return toast('처리하지 못했어요');
+  if (status) status.review_count = Math.max(0, (status.review_count || 1) - 1);
+  closeSheet(); renderCollector(); toast('넘겼어요');
 }
 
 // ---------------------------------------------------------------------
@@ -525,6 +581,7 @@ function setPick(id) {
   document.getElementById('add-btn').style.background = BRAND[id];
 }
 function openAdd() {
+  pendingReview = null;
   openSheet(`
     <h3 id="sheet-title" tabindex="-1">직접 기록하기</h3>
     <p class="lead">알림으로 안 들어온 결제를 적어 두세요.</p>
@@ -559,6 +616,7 @@ async function addPayment() {
   const { error } = await db.from('payments').insert({ card_id: addCardId, paid_at: `${date}T12:00:00+09:00`, amount, merchant: merchant || null, months, source: 'manual' });
   btn.disabled = false;
   if (error) { console.error(error); err.textContent = '기록하지 못했어요. 다시 눌러 주세요.'; return; }
+  if (pendingReview) { await db.from('inbox').update({ kind: 'resolved' }).eq('id', pendingReview); pendingReview = null; }
   closeSheet();
   const bm = billMonthOf(addCardId, date);
   toast(bm === currentBillMonth() ? '기록했어요' : `${M(bm)}월 결제에 기록했어요`);
