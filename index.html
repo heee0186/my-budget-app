@@ -300,12 +300,33 @@ function budgetFor(cardId, bm) {
 }
 
 // 이 청구월에 카드별로 잡히는 결제·할부
+// 계획 탭에서 카드로 나간다고 적은 고정비·구독 = 카드 자동이체 (알림이 안 와서 여기서 만들어요)
+function autoDebits(cardId, bm) {
+  if (typeof items === 'undefined') return [];
+  const method = Object.keys(CARD_METHOD).find(k => CARD_METHOD[k] === cardId);
+  const cyc = cycleOf(cardId, bm), prev = addMonths(bm, -1), start = card(cardId).cycle_start;
+  return items.filter(i => i.method === method && (i.kind === 'fixed' || i.kind === 'subscription') && itemActive(i, bm)).map(i => {
+    const day = i.pay_day || start;
+    const lastDay = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const date = day >= start ? ymd(Y(prev), M(prev), Math.min(day, lastDay(Y(prev), M(prev)))) : ymd(Y(bm), M(bm), day);
+    const amount = i.kind === 'subscription' ? (i.total || i.amount) : i.amount;
+    return { id: 'auto' + i.id, item_id: i.id, kind: i.kind, card_id: cardId, paid_at: date + 'T09:00:00+09:00', amount, merchant: i.name, memo: null, months: 1, source: 'auto', auto: true, _date: date <= cyc.end ? date : cyc.end };
+  });
+}
+
 function monthOf(cardId, bm) {
   const rows = [];
   payments.filter(p => p.card_id === cardId).forEach(p => shares(p).forEach(s => { if (s.bm === bm) rows.push({ p, s }); }));
+  // 자동이체: 같은 금액의 실제 기록이 앞뒤 4일 안에 있으면 실제 기록만 남겨요
+  autoDebits(cardId, bm).forEach(v => {
+    const dup = rows.find(r => !r.p.auto && !r.fixed && r.p.amount === v.amount && Math.abs(diffDays(kstDate(r.p.paid_at), v._date)) <= 4);
+    if (dup) dup.fixed = true;   // 실제 기록도 자동이체니까 '정해진 돈'
+    else rows.push({ p: v, s: { bm, amount: v.amount, k: 1, n: 1 }, fixed: true });
+  });
   rows.sort((a, b) => (a.p.paid_at < b.p.paid_at ? 1 : -1));
-  // 할부 2회차부터는 '이미 정해진 돈'. 첫 회차는 이번에 쓴 돈으로 봐요
-  const inst = rows.filter(r => r.s.n > 1 && r.s.k > 1).reduce((a, r) => a + r.s.amount, 0);
+  // '이미 정해진 돈': 할부 2회차부터 + 자동이체. 할부 첫 회차는 이번에 쓴 돈으로 봐요
+  const fixed = r => (r.s.n > 1 && r.s.k > 1) || r.fixed;
+  const inst = rows.filter(fixed).reduce((a, r) => a + r.s.amount, 0);
   const total = rows.reduce((a, r) => a + r.s.amount, 0);
   const budget = budgetFor(cardId, bm);
   return { rows, inst, used: total - inst, total, budget, left: budget - total };
@@ -414,7 +435,7 @@ function rowHtml(c, m) {
     ${barHtml(c.id, m)}
     <div class="row-meta num">
       <span>예산 <b>${m.budget ? won(m.budget) : '없음'}</b></span>
-      ${m.inst ? `<span>할부 <b>${won(m.inst)}</b></span>` : ''}
+      ${m.inst ? `<span>정해진 돈 <b>${won(m.inst)}</b></span>` : ''}
       <span>쓴 돈 <b>${won(m.used)}</b></span>
     </div>
   </button>`;
@@ -560,8 +581,9 @@ function openCard(id) {
     : `<div class="sheet-amount num" style="color:${color}">${won(m.left)} 남음</div>`;
   const items = m.rows.map(({ p, s }) => {
     const name = p.memo || p.merchant || (p.amount < 0 ? '취소' : '내역 없음');
-    const sub = [s.n > 1 ? `할부 ${s.k}/${s.n}` : '', p.memo && p.merchant ? p.merchant : ''].filter(Boolean).join(', ');
-    return `<button class="item" onclick="openItem(${p.id})">
+    const sub = p.auto ? '자동이체 · 계획 탭에서 고쳐요'
+      : [s.n > 1 ? `할부 ${s.k}/${s.n}` : '', p.memo && p.merchant ? p.merchant : ''].filter(Boolean).join(', ');
+    return `<button class="item" onclick="${p.auto ? `openItemEdit('${p.kind}', ${p.item_id})` : `openItem(${p.id})`}">
       <span class="d num">${md(kstDate(p.paid_at))}</span>
       <span class="t"><span>${esc(name)}</span>${sub ? `<em>${esc(sub)}</em>` : ''}</span>
       <span class="v num" ${s.amount < 0 ? `style="color:${color}"` : ''}>${s.amount < 0 ? '−' + won(-s.amount) : won(s.amount)}</span>
@@ -577,7 +599,7 @@ function openCard(id) {
     <p class="hint">한 번 정하면 다음 달에도 같은 금액으로 이어져요.</p>
     <div class="err" id="budget-err"></div>
     <button class="btn" onclick="saveBudget('${id}')" style="background:${color}">예산 저장</button>
-    <div class="section-h"><strong>내역</strong><span class="num">${m.rows.length}건${m.inst ? `, 할부 ${won(m.inst)} 포함` : ''}</span></div>
+    <div class="section-h"><strong>내역</strong><span class="num">${m.rows.length}건${m.inst ? `, 정해진 돈 ${won(m.inst)} 포함` : ''}</span></div>
     <div class="items">${items || '<div class="items-empty">아직 쓴 돈이 없어요</div>'}</div>
   `, m.budget ? null : '#budget-input');
 }
@@ -770,7 +792,7 @@ function renderPlan() {
     const g = p.groups[k];
     const notes = [];
     if (g.list.length) notes.push(`${g.list.length}개`);
-    if (g.onCard.length) notes.push(`카드로 나가는 ${g.onCard.length}개는 카드값에 포함`);
+    if (g.onCard.length) notes.push(`카드 자동이체 ${g.onCard.length}개는 카드값으로 잡혀요`);
     if (k === 'sinking' && g.list.length) notes.push(g.list.map(i => `${i.name} ${M(i.end_month)}월까지 ${won(i.total)}`).join(', '));
     const flag = g.toMove.length ? `<span class="s flag">${SUB_TARGET}로 옮길 구독 ${g.toMove.length}개</span>` : '';
     html += `<button class="pl child" onclick="openGroup('${k}')">
@@ -841,7 +863,7 @@ function openGroup(kind) {
   const rows = list.map(i => {
     const sub = kind === 'sinking'
       ? `${M(i.end_month)}월까지 ${won(i.total)} · 매달 ${won(monthlyOf(i))}`
-      : [i.pay_day ? `${i.pay_day}일` : '', i.method, kind === 'subscription' && i.total && i.total !== i.amount ? `전체 ${won(i.total)}` : '', !deducts(i) ? '카드값에 포함' : ''].filter(Boolean).join(' · ');
+      : [i.pay_day ? `${i.pay_day}일` : '', i.method, kind === 'subscription' && i.total && i.total !== i.amount ? `전체 ${won(i.total)}` : '', !deducts(i) ? '카드값으로 잡혀요' : ''].filter(Boolean).join(' · ');
     const flag = kind === 'subscription' && i.method !== SUB_TARGET;
     return `<button class="item" style="grid-template-columns:1fr auto" onclick="openItemEdit('${kind}', ${i.id})">
       <span class="t"><span>${esc(i.name)}</span><em ${flag ? 'style="color:#b26a00"' : ''}>${esc(sub)}${flag ? ` · ${SUB_TARGET}로 옮기기` : ''}</em></span>
@@ -850,7 +872,7 @@ function openGroup(kind) {
   }).join('');
   const lead = {
     saving: '급여가 들어오면 먼저 옮겨 두는 돈이에요.',
-    fixed: '보험, 통신비, 계처럼 매달 나가는 돈이에요. 카드로 나가는 건 카드값에 이미 들어 있어서 빼지 않아요.',
+    fixed: '보험, 통신비, 계처럼 매달 나가는 돈이에요. 카드 자동이체로 나가는 건 그 카드값으로 잡혀서 여기서는 빼지 않아요.',
     subscription: `같이 쓰는 구독은 내 몫만 적어요. ${SUB_TARGET} 체크카드로 모으는 중이에요.`,
     sinking: '여행처럼 큰돈이 나갈 일을 목표 금액과 달로 적으면, 매달 얼마씩 모을지 나눠 드려요.'
   }[kind];
@@ -892,7 +914,8 @@ function openItemEdit(kind, id) {
         <div></div>
       </div>
       <span class="label">어디서 나가요</span>
-      <div class="pick five" id="method-pick">${methodPick()}</div>`;
+      <div class="pick five" id="method-pick">${methodPick()}</div>
+      <p class="hint">카드를 고르면 매달 나가는 날에 그 카드값으로 자동으로 잡혀요. 자동이체는 결제 알림이 안 와서 이렇게 적어 두는 거예요.</p>`;
   }
   openSheet(`
     <h3 id="sheet-title" tabindex="-1">${i ? esc(i.name) : meta.name + ' 추가'}</h3>
