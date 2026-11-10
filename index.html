@@ -305,7 +305,7 @@ function autoDebits(cardId, bm) {
   if (typeof items === 'undefined') return [];
   const method = Object.keys(CARD_METHOD).find(k => CARD_METHOD[k] === cardId);
   const cyc = cycleOf(cardId, bm), prev = addMonths(bm, -1), start = card(cardId).cycle_start;
-  return items.filter(i => i.method === method && (i.kind === 'fixed' || i.kind === 'subscription') && itemActive(i, bm)).map(i => {
+  return items.filter(i => methodOf(i) === method && (i.kind === 'fixed' || i.kind === 'subscription') && itemActive(i, bm)).map(i => {
     const day = i.pay_day || start;
     const lastDay = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
     const date = day >= start ? ymd(Y(prev), M(prev), Math.min(day, lastDay(Y(prev), M(prev)))) : ymd(Y(bm), M(bm), day);
@@ -636,14 +636,17 @@ async function saveMemo(pid) {
   const { error } = await db.from('payments').update({ memo }).eq('id', pid);
   if (error) { document.getElementById('item-err').textContent = '저장하지 못했어요. 다시 눌러 주세요.'; return; }
   const p = payments.find(x => x.id === pid); if (p) p.memo = memo;
-  closeSheet(); render(); toast('메모를 저장했어요');
+  render(); toast('메모를 저장했어요');
+  if (p) openCard(p.card_id); else closeSheet();
 }
 async function deleteItem(pid, btn) {
   if (!btn.dataset.armed) { btn.dataset.armed = '1'; btn.textContent = '한 번 더 누르면 지워져요'; btn.classList.remove('quiet'); btn.classList.add('danger'); return; }
   const { error } = await db.from('payments').update({ hidden: true }).eq('id', pid);
   if (error) { document.getElementById('item-err').textContent = '지우지 못했어요. 다시 눌러 주세요.'; return; }
+  const gone = payments.find(x => x.id === pid);
   payments = payments.filter(x => x.id !== pid);
-  closeSheet(); render(); toast('내역을 지웠어요');
+  render(); toast('내역을 지웠어요');
+  if (gone) openCard(gone.card_id); else closeSheet();
 }
 
 // 직접 기록
@@ -723,7 +726,8 @@ const KINDS = {
   subscription: { name: '구독', unit: '내 몫' },
   sinking: { name: '목돈 모으기', unit: '매달' }
 };
-const METHODS = ['계좌', '카카오뱅크', '롯데', '농협', '삼성'];
+const METHODS = ['고정비 통장', '월급 통장', '카카오뱅크', '롯데', '농협', '삼성'];
+const methodOf = i => (!i.method || i.method === '계좌') ? '고정비 통장' : i.method;   // 예전 '계좌'는 고정비 통장으로
 const CARD_METHOD = { '롯데': 'lotte', '농협': 'nh', '삼성': 'samsung' };
 const SUB_TARGET = '카카오뱅크';   // 구독을 모으려는 곳
 
@@ -750,7 +754,7 @@ function salaryBillMonth() {
 }
 
 const itemActive = (i, bm) => (!i.start_month || i.start_month <= bm) && (!i.end_month || i.end_month >= bm);
-const deducts = i => i.kind === 'sinking' || !CARD_METHOD[i.method];   // 카드로 나가면 이미 카드값에 들어 있어요
+const deducts = i => i.kind === 'sinking' || i.kind === 'saving' || !CARD_METHOD[methodOf(i)];   // 카드로 나가면 이미 카드값에 들어 있어요
 function monthsBetween(a, b) { return (Y(b) - Y(a)) * 12 + (M(b) - M(a)) + 1; }
 function monthlyOf(i) {
   if (i.kind !== 'sinking') return i.amount;
@@ -765,10 +769,11 @@ function planOf(bm) {
   Object.keys(KINDS).forEach(k => {
     const list = act.filter(i => i.kind === k);
     groups[k] = {
-      list,
+      all: list,
+      list: list.filter(deducts),
       sum: list.filter(deducts).reduce((a, i) => a + monthlyOf(i), 0),
       onCard: list.filter(i => !deducts(i)),
-      toMove: k === 'subscription' ? list.filter(i => i.method !== SUB_TARGET) : []
+      toMove: k === 'subscription' ? list.filter(i => methodOf(i) !== SUB_TARGET) : []
     };
   });
   const setAside = Object.values(groups).reduce((a, g) => a + g.sum, 0);
@@ -777,7 +782,21 @@ function planOf(bm) {
   const budgetSum = cards.reduce((a, x) => a + x.m.budget, 0);
   const closed = CARDS.every(c => today() > cycleOf(c.id, bm).end);
   const actual = cards.reduce((a, x) => a + x.m.total, 0);
-  return { sal, groups, setAside, available, cards, budgetSum, closed, actual };
+  const cardAuto = act.filter(i => (i.kind === 'fixed' || i.kind === 'subscription') && !deducts(i));
+  // 급여 들어오면 옮길 돈
+  const sumBy = f => act.filter(i => deducts(i) && f(i)).reduce((a, i) => a + monthlyOf(i), 0);
+  const bill = id => { const x = cards.find(y => y.c.id === id); return closed || x.m.total > x.m.budget ? x.m.total : x.m.budget; };
+  const transfers = [
+    ...act.filter(i => i.kind === 'saving').map(i => ({ name: i.name, sub: '적금·투자', v: i.amount })),
+    { name: '고정비 통장', sub: '보험 등 고정비', v: sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '고정비 통장') },
+    { name: '카카오뱅크', sub: '구독 내 몫', v: sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '카카오뱅크') },
+    { name: '목돈 모으기', sub: act.filter(i => i.kind === 'sinking').map(i => i.name).join(', '), v: sumBy(i => i.kind === 'sinking') },
+    { name: '농협 통장', sub: `농협 카드값, ${card('nh').pay_day}일 결제` + (closed ? '' : ' (예상)'), v: bill('nh') }
+  ].filter(t => t.v > 0);
+  const stayMain = sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '월급 통장');
+  const mainCards = bill('lotte') + bill('samsung');
+  const moved = transfers.reduce((a, t) => a + t.v, 0);
+  return { sal, groups, setAside, available, cards, budgetSum, closed, actual, cardAuto, transfers, stayMain, mainCards, moved };
 }
 
 function renderPlan() {
@@ -792,7 +811,6 @@ function renderPlan() {
     const g = p.groups[k];
     const notes = [];
     if (g.list.length) notes.push(`${g.list.length}개`);
-    if (g.onCard.length) notes.push(`카드 자동이체 ${g.onCard.length}개는 카드값으로 잡혀요`);
     if (k === 'sinking' && g.list.length) notes.push(g.list.map(i => `${i.name} ${M(i.end_month)}월까지 ${won(i.total)}`).join(', '));
     const flag = g.toMove.length ? `<span class="s flag">${SUB_TARGET}로 옮길 구독 ${g.toMove.length}개</span>` : '';
     html += `<button class="pl child" onclick="openGroup('${k}')">
@@ -802,11 +820,17 @@ function renderPlan() {
   });
   html += `<div class="pl-sum"><strong>카드에 쓸 수 있는 돈</strong><span class="num">${won(p.available)}</span></div>`;
 
+  const autoSum = p.cardAuto.reduce((a, i) => a + (i.kind === 'subscription' ? (i.total || i.amount) : i.amount), 0);
+  html += `<button class="pl child" onclick="openGroup('card')" style="padding-left:0">
+    <span class="n">카드 자동이체</span><span class="v num">${p.cardAuto.length ? won(autoSum) : '추가하기'}</span>
+    <span class="s">${p.cardAuto.length ? `${p.cardAuto.length}개 · 카드 예산 안에서 나가요` : '통신비처럼 카드로 자동이체되는 것'}</span>
+  </button>`;
+
   html += `<div class="pl-h"><strong>카드 예산</strong><span class="num">${won(p.budgetSum)}</span></div>`;
   p.cards.forEach(({ c, m }) => {
     html += `<button class="pl child" onclick="openCard('${c.id}')">
       <span class="n" style="color:${BRAND[c.id]}">${esc(c.name)}</span><span class="v num">${m.budget ? won(m.budget) : '정하기'}</span>
-      <span class="s">${m.inst ? `할부 ${won(m.inst)} 포함 · ` : ''}지금까지 ${won(m.total)}</span>
+      <span class="s">${m.inst ? `정해진 돈 ${won(m.inst)} 포함 · ` : ''}지금까지 ${won(m.total)}</span>
     </button>`;
   });
 
@@ -820,6 +844,15 @@ function renderPlan() {
   else if (p.closed && realLeft < 0) tip = [`${won(-realLeft)} 모자라요`, '카드값이 쓸 수 있는 돈보다 많아요. 다음 달 예산을 조금 줄여 보세요.'];
   else if (plannedLeft > 0) tip = [`예산대로 쓰면 ${won(plannedLeft)} 더 모을 수 있어요`, '카드값이 확정되면 실제로 남는 돈을 알려 드려요.'];
   if (tip) html += `<div class="tip"><b>${tip[0]}</b>${tip[1]}</div>`;
+
+  // 급여 들어오면 옮길 돈
+  const sd = salaryDate(viewBM);
+  html += `<div class="pl-h" style="margin-top:12px"><strong>${mdKo(sd)}(${dow(sd)}) 급여 들어오면 옮길 돈</strong><span class="num">${won(p.moved)}</span></div>`;
+  p.transfers.forEach(t => {
+    html += `<div class="pl child"><span class="n">${esc(t.name)}</span><span class="v num">${won(t.v)}</span>${t.sub ? `<span class="s">${esc(t.sub)}</span>` : ''}</div>`;
+  });
+  html += `<div class="pl child"><span class="n">월급 통장에 남겨 둘 돈</span><span class="v num">${won(p.mainCards + p.stayMain)}</span>
+    <span class="s">롯데·삼성 카드값${p.closed ? '' : ' (예상)'}${p.stayMain ? `, 월급 통장에서 나가는 고정비 ${won(p.stayMain)}` : ''}</span></div>`;
   box.innerHTML = html;
 }
 
@@ -858,29 +891,34 @@ async function saveSalary(bm) {
 
 // 항목 묶음 (적금, 고정비, 구독, 목돈)
 function openGroup(kind) {
-  const meta = KINDS[kind];
-  const list = items.filter(i => i.kind === kind && itemActive(i, viewBM));
+  const meta = kind === 'card' ? { name: '카드 자동이체' } : KINDS[kind];
+  const list = kind === 'card'
+    ? items.filter(i => (i.kind === 'fixed' || i.kind === 'subscription') && !deducts(i) && itemActive(i, viewBM))
+    : items.filter(i => i.kind === kind && deducts(i) && itemActive(i, viewBM));
   const rows = list.map(i => {
     const sub = kind === 'sinking'
       ? `${M(i.end_month)}월까지 ${won(i.total)} · 매달 ${won(monthlyOf(i))}`
-      : [i.pay_day ? `${i.pay_day}일` : '', i.method, kind === 'subscription' && i.total && i.total !== i.amount ? `전체 ${won(i.total)}` : '', !deducts(i) ? '카드값으로 잡혀요' : ''].filter(Boolean).join(' · ');
-    const flag = kind === 'subscription' && i.method !== SUB_TARGET;
-    return `<button class="item" style="grid-template-columns:1fr auto" onclick="openItemEdit('${kind}', ${i.id})">
+      : kind === 'saving' ? (i.pay_day ? `${i.pay_day}일` : '')
+      : [i.pay_day ? `${i.pay_day}일` : '', methodOf(i), kind === 'subscription' && i.total && i.total !== i.amount ? `전체 ${won(i.total)}` : '', !deducts(i) ? '카드값으로 잡혀요' : ''].filter(Boolean).join(' · ');
+    const flag = i.kind === 'subscription' && methodOf(i) !== SUB_TARGET;
+    const shown = kind === 'card' && i.kind === 'subscription' ? (i.total || i.amount) : monthlyOf(i);
+    return `<button class="item" style="grid-template-columns:1fr auto" onclick="openItemEdit('${i.kind}', ${i.id})">
       <span class="t"><span>${esc(i.name)}</span><em ${flag ? 'style="color:#b26a00"' : ''}>${esc(sub)}${flag ? ` · ${SUB_TARGET}로 옮기기` : ''}</em></span>
-      <span class="v num" ${deducts(i) ? '' : 'style="color:var(--ink-3)"'}>${won(monthlyOf(i))}</span>
+      <span class="v num">${won(shown)}</span>
     </button>`;
   }).join('');
   const lead = {
     saving: '급여가 들어오면 먼저 옮겨 두는 돈이에요.',
-    fixed: '보험, 통신비, 계처럼 매달 나가는 돈이에요. 카드 자동이체로 나가는 건 그 카드값으로 잡혀서 여기서는 빼지 않아요.',
-    subscription: `같이 쓰는 구독은 내 몫만 적어요. ${SUB_TARGET} 체크카드로 모으는 중이에요.`,
+    fixed: '보험, 계처럼 통장에서 나가는 돈이에요. 카드로 자동이체되는 건 [카드 자동이체]로 따로 모여요.',
+    card: '통신비처럼 카드로 자동이체되는 고정비·구독이에요. 결제 알림이 안 와서, 매달 나가는 날에 그 카드값으로 잡아 둬요. 카드 예산 안에서 나가요.',
+    subscription: `같이 쓰는 구독은 내 몫만 적어요. ${SUB_TARGET} 체크카드로 모으는 중이에요. 아직 카드로 나가는 구독은 [카드 자동이체]에 있어요.`,
     sinking: '여행처럼 큰돈이 나갈 일을 목표 금액과 달로 적으면, 매달 얼마씩 모을지 나눠 드려요.'
   }[kind];
   openSheet(`
     <h3 id="sheet-title" tabindex="-1">${meta.name}</h3>
     <p class="lead">${lead}</p>
     <div class="items">${rows || '<div class="items-empty">아직 없어요</div>'}</div>
-    <button class="btn" onclick="openItemEdit('${kind}', null)">추가하기</button>
+    <button class="btn" onclick="openItemEdit('${kind === 'card' ? 'fixed' : kind}', null, '${kind === 'card' ? '농협' : ''}')">추가하기</button>
   `);
 }
 
@@ -893,9 +931,9 @@ function monthOptions(sel) {
   for (let k = 0; k < 24; k++) { const bm = addMonths(viewBM, k); o += `<option value="${bm}" ${bm === sel ? 'selected' : ''}>${Y(bm)}년 ${M(bm)}월</option>`; }
   return o;
 }
-function openItemEdit(kind, id) {
+function openItemEdit(kind, id, presetMethod) {
   const i = id ? items.find(x => x.id === id) : null;
-  editMethod = i ? i.method : (kind === 'subscription' ? SUB_TARGET : '계좌');
+  editMethod = i ? methodOf(i) : (presetMethod || (kind === 'subscription' ? SUB_TARGET : '고정비 통장'));
   const meta = KINDS[kind];
   let fields;
   if (kind === 'sinking') {
@@ -913,9 +951,9 @@ function openItemEdit(kind, id) {
         <div><label class="label" for="it-day">나가는 날</label><input class="input" id="it-day" inputmode="numeric" placeholder="25" value="${i && i.pay_day ? i.pay_day : ''}" style="font-size:16px"></div>
         <div></div>
       </div>
-      <span class="label">어디서 나가요</span>
-      <div class="pick five" id="method-pick">${methodPick()}</div>
-      <p class="hint">카드를 고르면 매달 나가는 날에 그 카드값으로 자동으로 잡혀요. 자동이체는 결제 알림이 안 와서 이렇게 적어 두는 거예요.</p>`;
+      ${kind === 'saving' ? '' : `<span class="label">어디서 나가요</span>
+      <div class="pick" id="method-pick">${methodPick()}</div>
+      <p class="hint">통장을 고르면 급여 들어올 때 그 통장으로 옮길 돈에 더해져요. 카드를 고르면 매달 나가는 날 그 카드값으로 잡혀요.</p>`}`;
   }
   openSheet(`
     <h3 id="sheet-title" tabindex="-1">${i ? esc(i.name) : meta.name + ' 추가'}</h3>
@@ -935,13 +973,13 @@ async function saveItem(kind, id) {
   if (kind === 'sinking') {
     row.total = num(document.getElementById('it-total').value);
     row.end_month = Number(document.getElementById('it-end').value);
-    row.amount = 0; row.method = '계좌';
+    row.amount = 0; row.method = '고정비 통장';
     if (row.total <= 0) { err.textContent = '목표 금액을 적어 주세요.'; return; }
   } else {
     row.amount = num(document.getElementById('it-amount').value);
     row.total = kind === 'subscription' ? (num(document.getElementById('it-total').value) || row.amount) : null;
     row.pay_day = parseInt(document.getElementById('it-day').value, 10) || null;
-    row.method = editMethod;
+    row.method = kind === 'saving' ? '고정비 통장' : editMethod;
     if (row.amount <= 0) { err.textContent = '금액을 적어 주세요.'; return; }
   }
   let res;
