@@ -985,8 +985,14 @@ async function saveItem(kind, id) {
   let res;
   if (id) res = await db.from('plan_items').update(row).eq('id', id);
   else { row.start_month = viewBM; row.sort = items.length + 1; res = await db.from('plan_items').insert(row); }
-  if (res.error) { console.error(res.error); err.textContent = '저장하지 못했어요. 다시 눌러 주세요.'; return; }
-  closeSheet(); toast('저장했어요'); load();
+  if (res.error) { console.error(res.error); err.textContent = '저장하지 못했어요. (' + (res.error.message || res.error.code || '알 수 없는 오류') + ')'; return; }
+  // 저장한 항목이 들어간 목록을 다시 열어서 보여줘요
+  const toCard = kind !== 'saving' && kind !== 'sinking' && CARD_METHOD[row.method];
+  const was = id ? items.find(x => x.id === id) : null;
+  const moved = was && (!!CARD_METHOD[methodOf(was)] !== !!toCard);
+  await load();
+  openGroup(toCard ? 'card' : kind);
+  toast(moved ? (toCard ? `${row.method}카드 자동이체로 옮겼어요` : `${KINDS[kind].name}로 옮겼어요`) : '저장했어요');
 }
 async function removeItem(id, btn) {
   if (!btn.dataset.armed) { btn.dataset.armed = '1'; btn.textContent = '한 번 더 누르면 빠져요'; btn.classList.remove('quiet'); btn.classList.add('danger'); return; }
@@ -994,7 +1000,7 @@ async function removeItem(id, btn) {
   const res = i && i.start_month && i.start_month >= viewBM
     ? await db.from('plan_items').delete().eq('id', id)                       // 이번 달에 만든 건 그냥 지워요
     : await db.from('plan_items').update({ end_month: addMonths(viewBM, -1) }).eq('id', id);   // 지난달까지는 기록으로 남겨요
-  if (res.error) { document.getElementById('it-err').textContent = '빼지 못했어요. 다시 눌러 주세요.'; return; }
+  if (res.error) { document.getElementById('it-err').textContent = '빼지 못했어요. (' + (res.error.message || res.error.code || '알 수 없는 오류') + ')'; return; }
   closeSheet(); toast('뺐어요'); load();
 }
 
