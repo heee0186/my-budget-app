@@ -350,7 +350,7 @@ async function load() {
     }
     if (viewBM === null) viewBM = currentBillMonth();
     const from = cycleOf('nh', addMonths(viewBM, -25)).start;
-    const to = addDays(cycleOf('lotte', viewBM).end, 1);
+    const to = addDays(cycleOf('lotte', addMonths(viewBM, 2)).end, 1);   // 나중에 온 취소도 연결하려고 두 달 뒤까지
     const all = [];
     for (let off = 0; ; off += 1000) {
       const { data, error } = await db.from('payments').select('*').eq('hidden', false)
@@ -378,7 +378,28 @@ async function load() {
 // ---------------------------------------------------------------------
 // 그리기
 // ---------------------------------------------------------------------
+// 취소 ↔ 원래 결제 연결: 같은 카드, 금액이 같거나(부분 취소면 작고 가게 이름이 비슷), 90일 안
+const normName = t => String(t || '').replace(/\s|\(주\)|주식회사|㈜|_|-|취소/g, '').toLowerCase();
+function linkCancels() {
+  const links = {};
+  const used = new Set();
+  const cancels = payments.filter(p => p.amount < 0).sort((a, b) => (a.paid_at < b.paid_at ? -1 : 1));
+  cancels.forEach(cx => {
+    const amt = -cx.amount, cn = normName(cx.merchant || cx.memo), ct = new Date(cx.paid_at);
+    const cands = payments.filter(p => p.card_id === cx.card_id && p.amount > 0 && !used.has(p.id)
+      && new Date(p.paid_at) <= ct && (ct - new Date(p.paid_at)) / 864e5 <= 90);
+    const similar = p => { const n = normName(p.merchant || p.memo); return cn && n && (n.includes(cn) || cn.includes(n)); };
+    const pick = cands.filter(p => p.amount === amt && similar(p))[0]
+      || cands.filter(p => p.amount === amt)[0]
+      || cands.filter(p => p.amount > amt && similar(p))[0];
+    if (pick) { used.add(pick.id); links[cx.id] = pick; links[pick.id] = cx; }
+  });
+  return links;
+}
+let cancelLinks = {};
+
 function render() {
+  cancelLinks = linkCancels();
   if (!CARDS.length || viewBM === null) return;
   const cur = currentBillMonth();
   const sal = salaryDate(viewBM);
@@ -612,8 +633,13 @@ function openCard(id) {
     : `<div class="sheet-amount num" style="color:${color}">${won(m.left)} 남음</div>`;
   const items = m.rows.map(({ p, s }) => {
     const name = p.memo || p.merchant || (p.amount < 0 ? '취소' : '내역 없음');
+    const ln = cancelLinks[p.id];
+    const lnText = !ln ? '' : p.amount < 0
+      ? `${md(kstDate(ln.paid_at))} ${ln.memo || ln.merchant || ''} 결제 취소`
+      : (-ln.amount < p.amount ? `${won(-ln.amount)} 부분 취소됨` : '취소됨')
+        + (billMonthOf(ln.card_id, kstDate(ln.paid_at)) !== s.bm ? ` · ${M(billMonthOf(ln.card_id, kstDate(ln.paid_at)))}월 카드값에서 돌려받아요` : '');
     const sub = p.auto ? '자동이체 · 계획 탭에서 고쳐요'
-      : [s.n > 1 ? `할부 ${s.k}/${s.n}` : '', p.memo && p.merchant ? p.merchant : ''].filter(Boolean).join(', ');
+      : [lnText, s.n > 1 ? `할부 ${s.k}/${s.n}` : '', p.memo && p.merchant ? p.merchant : ''].filter(Boolean).join(', ');
     return `<button class="item" onclick="${p.auto ? `openItemEdit('${p.kind}', ${p.item_id})` : `openItem(${p.id})`}">
       <span class="d num">${md(kstDate(p.paid_at))}</span>
       <span class="t"><span>${esc(name)}</span>${sub ? `<em>${esc(sub)}</em>` : ''}</span>
@@ -655,6 +681,11 @@ function openItem(pid) {
     <p class="lead">${esc(c.name)}, ${mdKo(kstDate(p.paid_at))}, ${how}</p>
     <div class="sheet-amount num">${p.amount < 0 ? '−' + won(-p.amount) : won(p.amount)}</div>
     ${p.months > 1 ? `<p class="hint" style="margin-top:-4px">${p.months}개월 할부</p>` : ''}
+    ${(() => { const ln = cancelLinks[p.id]; if (!ln) return '';
+      const bm = billMonthOf(ln.card_id, kstDate(ln.paid_at));
+      return p.amount < 0
+        ? `<div class="tip" style="margin-top:6px"><b>${mdKo(kstDate(ln.paid_at))} 결제의 취소예요</b>${esc(ln.memo || ln.merchant || '')} ${won(ln.amount)}</div>`
+        : `<div class="tip" style="margin-top:6px"><b>${mdKo(kstDate(ln.paid_at))}에 ${-ln.amount < p.amount ? won(-ln.amount) + ' 부분 ' : ''}취소됐어요</b>${M(bm)}월 카드값에서 ${won(-ln.amount)} 돌려받아요.</div>`; })()}
     <label class="label" for="memo-input">메모</label>
     <input class="input" id="memo-input" value="${esc(p.memo || '')}" placeholder="무엇을 샀는지 적어 두기">
     <div class="err" id="item-err"></div>
