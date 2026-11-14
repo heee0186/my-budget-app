@@ -127,6 +127,7 @@
   .input:focus { border-color: var(--ink); outline: none; }
   .money { position: relative; }
   .money .input { padding-right: 36px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .money.pct::after { content: '%'; }
   .money::after { content: '원'; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-2); font-size: 16px; }
   .hint { margin-top: 6px; font-size: 12.5px; color: var(--ink-3); }
   .err { margin-top: 8px; font-size: 13.5px; color: #b3261e; min-height: 1em; }
@@ -364,10 +365,11 @@ async function load() {
     if (b.error) throw b.error;
     const sa = await db.from('salaries').select('*');
     const it = await db.from('plan_items').select('*').order('sort').order('id');
+    const lo = await db.from('loans').select('*').order('id');
     const s = await db.rpc('collector_status');
     if (seq !== loadSeq) return;
     payments = all; budgets = b.data; status = s.data && s.data[0] ? s.data[0] : null;
-    salaries = sa.error ? [] : sa.data; items = it.error ? [] : it.data;
+    salaries = sa.error ? [] : sa.data; items = it.error ? [] : it.data; loans = lo.error ? [] : lo.data;
   } catch (e) {
     console.error(e);
     if (seq === loadSeq) toast('자료를 불러오지 못했어요. 인터넷 연결을 확인해 주세요');
@@ -782,6 +784,23 @@ function openLogout() {
 let tab = 'spend';
 let salaries = [];
 let items = [];
+let loans = [];
+
+// 마이너스통장: 한 달 이자와 다 갚는 달 계산
+function loanInfo(l, extra = 0) {
+  const r = (Number(l.rate) || 0) / 100 / 12;
+  const pay = (l.monthly || 0) + extra;
+  const interest = Math.round(l.balance * r);
+  if (l.balance <= 0) return { interest: 0, months: 0 };
+  if (pay <= interest) return { interest, months: Infinity };
+  let b = l.balance, n = 0;
+  while (b > 0 && n < 600) { b = b * (1 + r) - pay; n++; }
+  return { interest, months: n };
+}
+function monthsLater(n) {
+  const t = today(); const bm = addMonths(Number(t.slice(0, 4)) * 100 + Number(t.slice(5, 7)), n);
+  return `${Y(bm)}년 ${M(bm)}월`;
+}
 const KINDS = {
   saving: { name: '적금·투자', unit: '매달' },
   fixed: { name: '고정비', unit: '매달' },
@@ -838,7 +857,8 @@ function planOf(bm) {
       toMove: k === 'subscription' ? list.filter(i => methodOf(i) !== SUB_TARGET) : []
     };
   });
-  const setAside = Object.values(groups).reduce((a, g) => a + g.sum, 0);
+  const loanPay = loans.reduce((a, l) => a + (l.balance > 0 ? (l.monthly || 0) : 0), 0);
+  const setAside = Object.values(groups).reduce((a, g) => a + g.sum, 0) + loanPay;
   const available = sal.amount - setAside;
   const cards = CARDS.map(c => ({ c, m: monthOf(c.id, bm) }));
   const budgetSum = cards.reduce((a, x) => a + x.m.budget, 0);
@@ -853,12 +873,13 @@ function planOf(bm) {
     { name: '고정비 통장', sub: '보험 등 고정비', v: sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '고정비 통장') },
     { name: '카카오뱅크', sub: '구독 내 몫', v: sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '카카오뱅크') },
     { name: '목돈 모으기', sub: act.filter(i => i.kind === 'sinking').map(i => i.name).join(', '), v: sumBy(i => i.kind === 'sinking') },
-    { name: '농협 통장', sub: `농협 카드값, ${card('nh').pay_day}일 결제` + (closed ? '' : ' (예상)'), v: bill('nh') }
+    { name: '농협 통장', sub: `농협 카드값, ${card('nh').pay_day}일 결제` + (closed ? '' : ' (예상)'), v: bill('nh') },
+    ...loans.filter(l => l.balance > 0 && l.monthly > 0).map(l => ({ name: l.name, sub: '갚기', v: l.monthly }))
   ].filter(t => t.v > 0);
   const stayMain = sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '월급 통장');
   const mainCards = bill('lotte') + bill('samsung');
   const moved = transfers.reduce((a, t) => a + t.v, 0);
-  return { sal, groups, setAside, available, cards, budgetSum, closed, actual, cardAuto, transfers, stayMain, mainCards, moved };
+  return { sal, groups, setAside, available, cards, budgetSum, closed, actual, cardAuto, transfers, stayMain, mainCards, moved, loanPay };
 }
 
 function renderPlan() {
@@ -880,6 +901,14 @@ function renderPlan() {
       ${notes.length ? `<span class="s">${esc(notes.join(' · '))}</span>` : ''}${flag}
     </button>`;
   });
+  const loan = loans[0];
+  if (loan && loan.balance > 0) {
+    const li = loanInfo(loan);
+    html += `<button class="pl child" onclick="openLoan()"><span class="n">${esc(loan.name)} 갚기</span><span class="v num">${loan.monthly ? won(loan.monthly) : '정하기'}</span>
+      <span class="s ${li.months === Infinity ? 'flag' : ''}">남은 ${won(loan.balance)} · ${li.months === Infinity ? '이자보다 적게 갚아서 줄지 않아요' : `${monthsLater(li.months)}에 다 갚아요`}</span></button>`;
+  } else {
+    html += `<button class="pl child" onclick="openLoan()"><span class="n">마이너스통장</span><span class="v num">${loan ? '다 갚았어요' : '적기'}</span></button>`;
+  }
   html += `<div class="pl-sum"><strong>카드에 쓸 수 있는 돈</strong><span class="num">${won(p.available)}</span></div>`;
 
   const autoSum = p.cardAuto.reduce((a, i) => a + (i.kind === 'subscription' ? (i.total || i.amount) : i.amount), 0);
@@ -902,8 +931,13 @@ function renderPlan() {
   let tip;
   if (!p.sal.amount) tip = ['급여부터 적어 주세요', '급여를 적으면 카드에 쓸 수 있는 돈을 계산해요.'];
   else if (!p.closed && plannedLeft < 0) tip = [`카드 예산이 ${won(-plannedLeft)} 많아요`, '카드 예산을 줄이거나 빼둘 돈을 다시 봐 주세요.'];
+  else if (p.closed && realLeft > 0 && loan && loan.balance > 0) {
+    const a = loanInfo(loan), b2 = loanInfo({ ...loan, balance: Math.max(0, loan.balance - realLeft) });
+    const saved = a.months === Infinity ? '' : ` ${Math.max(0, a.months - b2.months)}개월 빨리 끝나요.`;
+    tip = [`${won(realLeft)}이 남아요`, `마통에 넣으면 이자를 줄일 수 있어요.${saved} 저축하고 싶으면 적금으로 옮겨도 돼요.`];
+  }
   else if (p.closed && realLeft > 0) tip = [`${won(realLeft)} 추가 저축할 수 있어요`, `카드값이 확정됐어요. ${mdKo(salaryDate(viewBM))} 급여에서 이만큼 더 모아 보세요.`];
-  else if (p.closed && realLeft < 0) tip = [`${won(-realLeft)} 모자라요`, '카드값이 쓸 수 있는 돈보다 많아요. 다음 달 예산을 조금 줄여 보세요.'];
+  else if (p.closed && realLeft < 0) tip = [`${won(-realLeft)} 모자라요`, (loan ? '이만큼 마통에서 빠져서 마이너스가 늘어나요. ' : '카드값이 쓸 수 있는 돈보다 많아요. ') + '다음 달 예산을 조금 줄여 보세요.'];
   else if (plannedLeft > 0) tip = [`예산대로 쓰면 ${won(plannedLeft)} 더 모을 수 있어요`, '카드값이 확정되면 실제로 남는 돈을 알려 드려요.'];
   if (tip) html += `<div class="tip"><b>${tip[0]}</b>${tip[1]}</div>`;
 
@@ -982,6 +1016,44 @@ function openGroup(kind) {
     <div class="items">${rows || '<div class="items-empty">아직 없어요</div>'}</div>
     <button class="btn" onclick="openItemEdit('${kind === 'card' ? 'fixed' : kind}', null, '${kind === 'card' ? '농협' : ''}')">추가하기</button>
   `);
+}
+
+function openLoan() {
+  const l = loans[0] || { name: '마이너스통장', balance: 0, rate: '', monthly: 0 };
+  openSheet(`
+    <h3 id="sheet-title" tabindex="-1">마이너스통장</h3>
+    <p class="lead">가끔 은행 앱을 보고 잔액만 고쳐 주세요. 이자와 다 갚는 달을 계산해요.</p>
+    <label class="label" for="loan-balance">지금 마이너스 금액</label>${moneyInput('loan-balance', l.balance ? comma(l.balance) : '')}
+    ${l.as_of ? `<p class="hint">${mdKo(l.as_of)} 기준</p>` : ''}
+    <div class="split">
+      <div><label class="label" for="loan-rate">연 금리</label><div class="money pct"><input class="input" id="loan-rate" inputmode="decimal" value="${l.rate ?? ''}" placeholder="6.5" style="text-align:right;padding-right:36px;font-weight:600"></div></div>
+      <div><label class="label" for="loan-monthly">매달 갚을 금액</label>${moneyInput('loan-monthly', l.monthly ? comma(l.monthly) : '')}</div>
+    </div>
+    <div class="tip" id="loan-preview" style="margin-top:14px"></div>
+    <div class="err" id="loan-err"></div>
+    <button class="btn" onclick="saveLoan()">저장</button>
+  `, l.balance ? null : '#loan-balance');
+  const upd = () => {
+    const x = { balance: num(document.getElementById('loan-balance').value), rate: parseFloat(document.getElementById('loan-rate').value) || 0, monthly: num(document.getElementById('loan-monthly').value) };
+    const li = loanInfo(x), box = document.getElementById('loan-preview');
+    if (!x.balance) { box.innerHTML = '<b>마이너스가 없어요</b>다 갚았다면 0으로 두세요.'; return; }
+    box.innerHTML = `<b>한 달 이자 약 ${won(li.interest)}</b>` + (!x.rate ? '금리를 적으면 이자를 계산해요.' :
+      li.months === Infinity ? '매달 갚는 돈이 이자보다 적어서 잔액이 줄지 않아요.' : `이대로 갚으면 ${monthsLater(li.months)}에 다 갚아요 (${li.months}개월).`);
+  };
+  ['loan-balance', 'loan-rate', 'loan-monthly'].forEach(id => document.getElementById(id).addEventListener('input', upd));
+  upd();
+}
+async function saveLoan() {
+  const row = {
+    name: '마이너스통장',
+    balance: num(document.getElementById('loan-balance').value),
+    rate: parseFloat(document.getElementById('loan-rate').value) || null,
+    monthly: num(document.getElementById('loan-monthly').value),
+    as_of: today(), updated_at: new Date().toISOString()
+  };
+  const res = loans[0] ? await db.from('loans').update(row).eq('id', loans[0].id) : await db.from('loans').insert(row);
+  if (res.error) { document.getElementById('loan-err').textContent = '저장하지 못했어요. (' + (res.error.message || res.error.code) + ')'; return; }
+  closeSheet(); toast('마통 정보를 저장했어요'); load();
 }
 
 let editMethod = '계좌';
