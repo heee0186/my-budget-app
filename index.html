@@ -79,6 +79,16 @@
   .tabs { display: flex; gap: 18px; margin: -8px 0 18px; }
   .tabs button { font-size: 15px; font-weight: 600; color: var(--ink-3); padding: 6px 0; border-bottom: 2px solid transparent; }
   .tabs button[aria-current="page"] { color: var(--ink); border-color: var(--ink); }
+  .loan-bar { grid-column: 1 / -1; display: block; height: 6px; margin-top: 8px; border-radius: 3px; background: var(--rule); overflow: hidden; }
+  .loan-bar i { display: block; height: 100%; background: var(--ink); border-radius: 3px; }
+  .notes:empty { display: none; }
+  .notes { display: grid; gap: 8px; margin: 0 0 18px; }
+  .note { display: block; width: 100%; text-align: left; padding: 12px 14px 12px 16px; border-radius: 12px; background: #fff; border: 1px solid var(--rule); border-left: 4px solid var(--c); font-size: 13.5px; color: var(--ink-2); }
+  .note b { display: block; color: var(--ink); font-size: 14.5px; margin-bottom: 1px; }
+  .note.warn { display: flex; align-items: flex-start; padding: 0; }
+  .note .note-body { flex: 1; text-align: left; padding: 12px 6px 12px 14px; font-size: 13.5px; color: var(--ink-2); background: none; border: 0; }
+  .note .note-x { padding: 12px 14px; color: var(--ink-2); background: none; border: 0; font-size: 14px; }
+  .split-list li { grid-template-columns: 1fr auto; }
   .banner { display: block; width: 100%; text-align: left; margin: 0 0 16px; padding: 13px 16px; border-radius: 14px; border: 1.5px solid var(--ink); background: #fff; font-size: 14px; }
   .banner b { display: block; font-size: 15px; }
   .banner::after { content: '›'; float: right; margin-top: -30px; color: var(--ink-2); font-size: 18px; }
@@ -200,6 +210,7 @@
   </header>
 
   <div class="alert" id="alert" hidden></div>
+  <div class="notes" id="notes"></div>
 
   <section class="cards" id="cards" aria-label="카드별 남은 예산"></section>
   <section class="plan" id="plan" aria-label="급여 계획" hidden></section>
@@ -338,11 +349,14 @@ function monthOf(cardId, bm) {
   });
   rows.sort((a, b) => (a.p.paid_at < b.p.paid_at ? 1 : -1));
   // '이미 정해진 돈': 할부 2회차부터 + 자동이체. 할부 첫 회차는 이번에 쓴 돈으로 봐요
+  // 돌려받는 결제(가족 폰 할부 등)는 카드값엔 들어가지만 내 지출·예산에서는 빼요
   const fixed = r => (r.s.n > 1 && r.s.k > 1) || r.fixed;
-  const inst = rows.filter(fixed).reduce((a, r) => a + r.s.amount, 0);
+  const mineRows = rows.filter(r => !r.p.reimbursed);
+  const inst = mineRows.filter(fixed).reduce((a, r) => a + r.s.amount, 0);
   const total = rows.reduce((a, r) => a + r.s.amount, 0);
+  const mine = mineRows.reduce((a, r) => a + r.s.amount, 0);
   const budget = budgetFor(cardId, bm);
-  return { rows, inst, used: total - inst, total, budget, left: budget - total };
+  return { rows, inst, used: mine - inst, total, mine, back: total - mine, budget, left: budget - mine };
 }
 
 function payDate(cardId, bm) { return ymd(Y(bm), M(bm), card(cardId).pay_day); }
@@ -441,10 +455,37 @@ function render() {
   if (tab !== 'spend') document.getElementById('soon').hidden = true;
   renderPayslip();
   renderCollector();
+  renderNotes(cur);
+}
+
+// 첫 화면 알림: 예산 80%·100%, 새 할부
+const seenKey = 'gagyebu.seenInstallments';
+function seenInst() { try { return JSON.parse(localStorage.getItem(seenKey) || '[]'); } catch (e) { return []; } }
+function hideInst(id) {
+  try { localStorage.setItem(seenKey, JSON.stringify(seenInst().concat(id).slice(-50))); } catch (e) { }
+  renderNotes(currentBillMonth());
+}
+function renderNotes(cur) {
+  const box = document.getElementById('notes');
+  if (tab !== 'spend' || viewBM !== cur) { box.innerHTML = ''; return; }
+  const out = [];
+  CARDS.forEach(c => {
+    const m = monthOf(c.id, cur);
+    if (!m.budget) return;
+    const pct = Math.floor(m.mine / m.budget * 100);
+    if (pct >= 100) out.push(`<button class="note" style="--c:${BRAND[c.id]}" onclick="openCard('${c.id}')"><b>${esc(c.name)} 예산을 넘었어요</b>${won(m.mine - m.budget)} 초과 · 예산 ${won(m.budget)}</button>`);
+    else if (pct >= 80) out.push(`<button class="note" style="--c:${BRAND[c.id]}" onclick="openCard('${c.id}')"><b>${esc(c.name)} 예산 ${pct}% 썼어요</b>${won(m.left)} 남았어요 · ${whenText(c)}</button>`);
+  });
+  const seen = seenInst(), since = addDays(today(), -14);
+  payments.filter(p => p.months > 1 && p.amount > 0 && !p.reimbursed && kstDate(p.paid_at) >= since && !seen.includes(p.id)).forEach(p => {
+    const sh = shares(p), c = card(p.card_id);
+    out.push(`<div class="note warn" style="--c:${BRAND[p.card_id]}"><button class="note-body" onclick="openItem(${p.id})"><b>새 할부 결제 · ${esc(c.name)}</b>${esc(p.merchant || p.memo || '')} ${won(p.amount)} ${p.months}개월 · ${M(sh[0].bm)}월부터 ${M(sh[sh.length - 1].bm)}월까지 매달 약 ${won(sh[sh.length - 1].amount)}</button><button class="note-x" onclick="hideInst(${p.id})" aria-label="확인했어요">✕</button></div>`);
+  });
+  box.innerHTML = out.join('');
 }
 
 function barHtml(id, m) {
-  const scale = Math.max(m.budget, m.total, 1);
+  const scale = Math.max(m.budget, m.mine, 1);
   const iw = m.inst / scale * 100, uw = Math.max(0, m.used) / scale * 100;
   const over = m.budget && m.left < 0;
   // 예산을 넘으면 쓴 돈 부분만 사선 무늬, 예산이 끝나는 자리에 눈금
@@ -474,6 +515,7 @@ function rowHtml(c, m) {
       <span>예산 <b>${m.budget ? won(m.budget) : '없음'}</b></span>
       ${m.inst ? `<span>정해진 돈 <b>${won(m.inst)}</b></span>` : ''}
       <span>쓴 돈 <b>${won(m.used)}</b></span>
+      ${m.back ? `<span>돌려받을 돈 <b>${won(m.back)}</b></span>` : ''}
       ${billFor(c.id, viewBM) ? `<span>카드사 청구 <b>${won(billFor(c.id, viewBM).amount)}</b></span>` : ''}
     </div>
   </button>`;
@@ -642,7 +684,7 @@ function formatMoney(el) {
 // 카드 자세히: 예산 + 내역
 function openCard(id) {
   const c = card(id), m = monthOf(id, viewBM), cyc = cycleOf(id, viewBM), color = BRAND[id];
-  const big = !m.budget ? `<div class="sheet-amount num">${won(m.total)}<small style="font-size:15px;color:var(--ink-2);font-weight:500"> 썼어요</small></div>`
+  const big = !m.budget ? `<div class="sheet-amount num">${won(m.mine)}<small style="font-size:15px;color:var(--ink-2);font-weight:500"> 썼어요</small></div>`
     : m.left < 0 ? `<div class="sheet-amount num" style="color:${color}">${won(-m.left)} 초과</div>`
     : `<div class="sheet-amount num" style="color:${color}">${won(m.left)} 남음</div>`;
   const items = m.rows.map(({ p, s }) => {
@@ -653,7 +695,7 @@ function openCard(id) {
       : (-ln.amount < p.amount ? `${won(-ln.amount)} 부분 취소됨` : '취소됨')
         + (shares(ln)[0].bm !== s.bm ? ` · ${M(shares(ln)[0].bm)}월 카드값에서 돌려받아요` : '');
     const sub = p.auto ? '자동이체 · 계획 탭에서 고쳐요'
-      : [lnText, s.n > 1 ? `할부 ${s.k}/${s.n}` : '', p.memo && p.merchant ? p.merchant : ''].filter(Boolean).join(', ');
+      : [p.reimbursed ? `돌려받음${p.reimbursed_by ? '(' + p.reimbursed_by + ')' : ''}` : '', lnText, s.n > 1 ? `할부 ${s.k}/${s.n}` : '', p.memo && p.merchant ? p.merchant : ''].filter(Boolean).join(', ');
     return `<button class="item" onclick="${p.auto ? `openItemEdit('${p.kind}', ${p.item_id})` : `openItem(${p.id})`}">
       <span class="d num">${md(kstDate(p.paid_at))}</span>
       <span class="t"><span>${esc(name)}</span>${sub ? `<em>${esc(sub)}</em>` : ''}</span>
@@ -665,6 +707,11 @@ function openCard(id) {
     <p class="lead">${md(cyc.start)}부터 ${md(cyc.end)}까지 쓴 돈, ${M(viewBM)}월 ${c.pay_day}일 ${esc(c.account || '')}에서 결제</p>
     ${big}
     ${barHtml(id, m)}
+    ${m.back ? `<ul class="pay-list split-list">
+      <li><span>카드 청구</span><span class="v num">${won(m.total)}</span></li>
+      <li><span>내 실제 지출</span><span class="v num">${won(m.mine)}</span></li>
+      <li><span>돌려받을 돈</span><span class="v num">${won(m.back)}</span></li></ul>
+      <p class="hint">예산은 내 실제 지출로 계산해요.</p>` : ''}
     ${(() => { const b = billFor(id, viewBM); if (!b) return ''; const diff = b.amount - m.total;
       return `<div class="tip" style="margin-top:14px"><b>카드사 청구액 ${won(b.amount)}</b>${mdKo(kstDate(b.created_at))}에 받은 결제예정금액 알림이에요. ${diff === 0 ? '기록과 똑같아요.' : `기록보다 ${won(Math.abs(diff))} ${diff < 0 ? '적어요 (할인이나 다음 달로 넘어간 결제 때문일 수 있어요)' : '많아요 (기록에 빠진 결제가 있을 수 있어요)'}.`}</div>`; })()}
     <label class="label" for="budget-input">${M(viewBM)}월 예산</label>
@@ -702,6 +749,10 @@ function openItem(pid) {
       return p.amount < 0
         ? `<div class="tip" style="margin-top:6px"><b>${mdKo(kstDate(ln.paid_at))} 결제의 취소예요</b>${esc(ln.memo || ln.merchant || '')} ${won(ln.amount)}</div>`
         : `<div class="tip" style="margin-top:6px"><b>${mdKo(kstDate(ln.paid_at))}에 ${-ln.amount < p.amount ? won(-ln.amount) + ' 부분 ' : ''}취소됐어요</b>${M(bm)}월 카드값에서 ${won(-ln.amount)} 돌려받아요.</div>`; })()}
+    ${p.amount > 0 ? (p.reimbursed
+      ? `<div class="tip" style="margin-top:6px"><b>돌려받는 결제예요${p.reimbursed_by ? ` · ${esc(p.reimbursed_by)}` : ''}</b>카드값엔 들어가지만 내 지출과 예산에서는 빠져요.</div>
+         <button class="btn quiet" onclick="setReimbursed(${p.id}, false)">돌려받지 않는 결제로 되돌리기</button>`
+      : `<button class="btn quiet" onclick="openReimburse(${p.id})">돌려받는 결제로 표시</button>`) : ''}
     <label class="label" for="memo-input">메모</label>
     <input class="input" id="memo-input" value="${esc(p.memo || '')}" placeholder="무엇을 샀는지 적어 두기">
     <div class="err" id="item-err"></div>
@@ -709,6 +760,49 @@ function openItem(pid) {
     <button class="btn quiet" id="del-btn" onclick="deleteItem(${p.id}, this)">이 내역 지우기</button>
   `);
 }
+// 돌려받는 결제: 누가 돌려주는지 → 같은 가게·같은 금액의 다음 결제도 자동으로 할지 물어봐요
+function openReimburse(pid) {
+  const p = payments.find(x => x.id === pid); if (!p) return;
+  const who = ['가족', '친구', '회사'];
+  openSheet(`
+    <h3 id="sheet-title" tabindex="-1">돌려받는 결제</h3>
+    <p class="lead">${esc(p.merchant || p.memo || '')} ${won(p.amount)}${p.months > 1 ? ` (${p.months}개월 할부, 모든 회차)` : ''}</p>
+    <label class="label" for="rb-who">누가 돌려줘요?</label>
+    <div class="pick" id="rb-pick">${who.map(w => `<button type="button" onclick="document.getElementById('rb-who').value='${w}'">${w}</button>`).join('')}</div>
+    <input class="input" id="rb-who" value="가족" style="margin-top:8px">
+    <div class="err" id="rb-err"></div>
+    ${p.months > 1 ? '' : `<p class="hint" style="margin-top:16px">${esc(p.merchant || '이 가게')}에서 ${won(p.amount)}이 다음에 또 결제되면</p>`}
+    ${p.months > 1
+      ? `<button class="btn" onclick="setReimbursed(${p.id}, true, false)">표시하기</button>`
+      : `<button class="btn" onclick="setReimbursed(${p.id}, true, true)">다음 결제도 자동으로 표시</button>
+         <button class="btn quiet" onclick="setReimbursed(${p.id}, true, false)">이번 결제만 표시</button>`}
+  `);
+}
+async function setReimbursed(pid, on, rule) {
+  const p = payments.find(x => x.id === pid); if (!p) return;
+  const by = on ? ((document.getElementById('rb-who') || {}).value || '').trim() || null : null;
+  const err = t => { const e = document.getElementById(on ? 'rb-err' : 'item-err'); if (e) e.textContent = t; };
+  let ids = [pid];
+  if (on && rule) {
+    const key = normName(p.merchant);
+    const r = await db.from('reimburse_rules').upsert({ card_id: p.card_id, merchant_key: key, amount: p.amount, reimbursed_by: by }, { onConflict: 'card_id,merchant_key,amount' });
+    if (r.error) { console.error(r.error); err('저장하지 못했어요. 다시 눌러 주세요.'); return; }
+    // 이미 들어와 있는 이후 결제도 같이
+    ids = ids.concat(payments.filter(x => x.id !== pid && x.card_id === p.card_id && x.amount === p.amount && !x.reimbursed
+      && x.paid_at > p.paid_at && key && (normName(x.merchant).includes(key) || key.includes(normName(x.merchant)))).map(x => x.id));
+  }
+  if (!on) {
+    const key = normName(p.merchant);
+    await db.from('reimburse_rules').delete().eq('card_id', p.card_id).eq('merchant_key', key).eq('amount', p.amount);
+  }
+  const { error } = await db.from('payments').update({ reimbursed: on, reimbursed_by: by }).in('id', ids);
+  if (error) { console.error(error); err('저장하지 못했어요. 다시 눌러 주세요.'); return; }
+  payments.forEach(x => { if (ids.includes(x.id)) { x.reimbursed = on; x.reimbursed_by = by; } });
+  render();
+  toast(!on ? '돌려받는 결제에서 뺐어요' : ids.length > 1 ? `${ids.length}건을 돌려받는 결제로 표시했어요` : rule ? '다음 결제부터도 자동으로 표시해요' : '돌려받는 결제로 표시했어요');
+  openCard(p.card_id);
+}
+
 async function saveMemo(pid) {
   const memo = document.getElementById('memo-input').value.trim() || null;
   const { error } = await db.from('payments').update({ memo }).eq('id', pid);
@@ -813,6 +907,13 @@ function loanInfo(l, extra = 0) {
   while (b > 0 && n < 600) { b = b * (1 + r) - pay; n++; }
   return { interest, months: n };
 }
+// 처음 적은 잔액에서 0원까지 얼마나 갚았는지
+function loanBar(l) {
+  const start = Math.max(l.start_balance || l.balance, l.balance, 1);
+  const pct = Math.max(0, Math.min(100, Math.round((start - l.balance) / start * 100)));
+  return `<span class="loan-bar" aria-label="${pct}% 갚음"><i style="width:${pct}%"></i></span>
+    <span class="s">${won(start)}에서 ${pct}% 갚았어요 · 목표 0원</span>`;
+}
 function monthsLater(n) {
   const t = today(); const bm = addMonths(Number(t.slice(0, 4)) * 100 + Number(t.slice(5, 7)), n);
   return `${Y(bm)}년 ${M(bm)}월`;
@@ -883,7 +984,7 @@ function planOf(bm) {
   const cardAuto = act.filter(i => (i.kind === 'fixed' || i.kind === 'subscription') && !deducts(i));
   // 급여 들어오면 옮길 돈
   const sumBy = f => act.filter(i => deducts(i) && f(i)).reduce((a, i) => a + monthlyOf(i), 0);
-  const bill = id => { const real = billFor(id, bm); if (real) return real.amount; const x = cards.find(y => y.c.id === id); return closed || x.m.total > x.m.budget ? x.m.total : x.m.budget; };
+  const bill = id => { const real = billFor(id, bm); if (real) return real.amount; const x = cards.find(y => y.c.id === id); return closed || x.m.mine > x.m.budget ? x.m.total : x.m.budget + x.m.back; };
   const transfers = [
     ...act.filter(i => i.kind === 'saving').map(i => ({ name: i.name, sub: '적금·투자', v: i.amount })),
     { name: '고정비 통장', sub: '보험 등 고정비', v: sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '고정비 통장') },
@@ -922,7 +1023,8 @@ function renderPlan() {
   if (loan && loan.balance > 0) {
     const li = loanInfo(loan);
     html += `<button class="pl child" onclick="openLoan()"><span class="n">${esc(loan.name)} 갚기</span><span class="v num">${loan.monthly ? won(loan.monthly) : '정하기'}</span>
-      <span class="s ${li.months === Infinity ? 'flag' : ''}">남은 ${won(loan.balance)} · ${li.months === Infinity ? '이자보다 적게 갚아서 줄지 않아요' : `${monthsLater(li.months)}에 다 갚아요`}</span></button>`;
+      <span class="s ${li.months === Infinity ? 'flag' : ''}">남은 ${won(loan.balance)} · ${li.months === Infinity ? '이자보다 적게 갚아서 줄지 않아요' : `${monthsLater(li.months)}에 다 갚아요`}</span>
+      ${loanBar(loan)}</button>`;
   } else {
     html += `<button class="pl child" onclick="openLoan()"><span class="n">마이너스통장</span><span class="v num">${loan ? '다 갚았어요' : '적기'}</span></button>`;
   }
@@ -1068,6 +1170,9 @@ async function saveLoan() {
     monthly: num(document.getElementById('loan-monthly').value),
     as_of: today(), updated_at: new Date().toISOString()
   };
+  // 진행률 기준: 처음 잔액. 잔액이 그보다 늘면 늘어난 금액을 새 기준으로
+  const prevStart = loans[0] && loans[0].start_balance;
+  row.start_balance = Math.max(prevStart || 0, row.balance);
   const res = loans[0] ? await db.from('loans').update(row).eq('id', loans[0].id) : await db.from('loans').insert(row);
   if (res.error) { document.getElementById('loan-err').textContent = '저장하지 못했어요. (' + (res.error.message || res.error.code) + ')'; return; }
   closeSheet(); toast('마통 정보를 저장했어요'); load();
