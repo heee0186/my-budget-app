@@ -36,9 +36,9 @@ create table if not exists gagyebu.cards (
   installment_unit int  not null default 100  -- 할부 월 납입액 단위 (원)
 );
 insert into gagyebu.cards (id, name, sort, cycle_start, pay_day, account, color, installment_unit) values
-  ('lotte',   '롯데', 1, 7, 20, '급여 통장', '#7F77DD', 100),
+  ('lotte',   '롯데', 1, 7, 20, '카카오뱅크', '#7F77DD', 100),
   ('nh',      '농협', 2, 5, 18, '농협 통장', '#1D9E75', 1),
-  ('samsung', '삼성', 3, 6, 18, '급여 통장', '#378ADD', 100)
+  ('samsung', '삼성', 3, 6, 18, '카카오뱅크', '#378ADD', 100)
 on conflict (id) do update set
   name = excluded.name, sort = excluded.sort, cycle_start = excluded.cycle_start,
   pay_day = excluded.pay_day, account = excluded.account, color = excluded.color,

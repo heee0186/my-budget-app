@@ -889,6 +889,7 @@ function planOf(bm) {
     { name: '고정비 통장', sub: '보험 등 고정비', v: sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '고정비 통장') },
     { name: '카카오뱅크', sub: '구독 내 몫', v: sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '카카오뱅크') },
     { name: '목돈 모으기', sub: act.filter(i => i.kind === 'sinking').map(i => i.name).join(', '), v: sumBy(i => i.kind === 'sinking') },
+    { name: '카카오뱅크 (카드값)', sub: `롯데 ${card('lotte').pay_day}일·삼성 ${card('samsung').pay_day}일 결제` + (closed ? '' : ' (예상)'), v: bill('lotte') + bill('samsung') },
     { name: '농협 통장', sub: `농협 카드값, ${card('nh').pay_day}일 결제` + (closed ? '' : ' (예상)'), v: bill('nh') },
     ...loans.filter(l => l.balance > 0 && l.monthly > 0).map(l => ({ name: l.name, sub: '갚기', v: l.monthly }))
   ].filter(t => t.v > 0);
@@ -963,8 +964,8 @@ function renderPlan() {
   p.transfers.forEach(t => {
     html += `<div class="pl child"><span class="n">${esc(t.name)}</span><span class="v num">${won(t.v)}</span>${t.sub ? `<span class="s">${esc(t.sub)}</span>` : ''}</div>`;
   });
-  html += `<div class="pl child"><span class="n">월급 통장에 남겨 둘 돈</span><span class="v num">${won(p.mainCards + p.stayMain)}</span>
-    <span class="s">롯데·삼성 카드값${p.closed ? '' : ' (예상)'}${p.stayMain ? `, 월급 통장에서 나가는 고정비 ${won(p.stayMain)}` : ''}</span></div>`;
+  if (p.stayMain) html += `<div class="pl child"><span class="n">월급 통장에 남겨 둘 돈</span><span class="v num">${won(p.stayMain)}</span>
+    <span class="s">월급 통장에서 나가는 고정비</span></div>`;
   box.innerHTML = html;
 }
 
