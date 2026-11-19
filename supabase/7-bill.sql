@@ -133,7 +133,7 @@ returns integer language plpgsql security definer set search_path = gagyebu, pub
 declare r gagyebu.inbox; n integer := 0;
 begin
   if not gagyebu.is_owner() and current_user not in ('postgres', 'supabase_admin') then raise exception 'not allowed'; end if;
-  for r in select * from gagyebu.inbox where kind is distinct from 'dismissed' and kind is distinct from 'resolved' loop
+  for r in select * from gagyebu.inbox where kind is distinct from 'dismissed' and kind is distinct from 'resolved' and source is distinct from 'manual' loop
     r := gagyebu.parse_inbox(r);
     update gagyebu.inbox set kind = r.kind, card_id = r.card_id, amount = r.amount, merchant = r.merchant,
       months = r.months, approved_at = r.approved_at, note = r.note, bill_month = r.bill_month where id = r.id;
