@@ -366,10 +366,12 @@ async function load() {
     const sa = await db.from('salaries').select('*');
     const it = await db.from('plan_items').select('*').order('sort').order('id');
     const lo = await db.from('loans').select('*').order('id');
+    const bl = await db.from('inbox').select('card_id, bill_month, amount, created_at').eq('kind', 'bill').order('id');
     const s = await db.rpc('collector_status');
     if (seq !== loadSeq) return;
     payments = all; budgets = b.data; status = s.data && s.data[0] ? s.data[0] : null;
     salaries = sa.error ? [] : sa.data; items = it.error ? [] : it.data; loans = lo.error ? [] : lo.data;
+    bills = {}; (bl.error ? [] : bl.data).forEach(b => { if (b.card_id && b.bill_month) bills[b.card_id + '|' + b.bill_month] = b; });
   } catch (e) {
     console.error(e);
     if (seq === loadSeq) toast('자료를 불러오지 못했어요. 인터넷 연결을 확인해 주세요');
@@ -463,6 +465,7 @@ function rowHtml(c, m) {
       <span>예산 <b>${m.budget ? won(m.budget) : '없음'}</b></span>
       ${m.inst ? `<span>정해진 돈 <b>${won(m.inst)}</b></span>` : ''}
       <span>쓴 돈 <b>${won(m.used)}</b></span>
+      ${billFor(c.id, viewBM) ? `<span>카드사 청구 <b>${won(billFor(c.id, viewBM).amount)}</b></span>` : ''}
     </div>
   </button>`;
 }
@@ -472,7 +475,7 @@ function soonData() {
   const cur = currentBillMonth(), prev = addMonths(cur, -1);
   const lastPay = CARDS.reduce((a, c) => (payDate(c.id, prev) > a ? payDate(c.id, prev) : a), '');
   if (today() > lastPay) return null;
-  const items = CARDS.map(c => ({ c, v: monthOf(c.id, prev).total }))
+  const items = CARDS.map(c => { const b = billFor(c.id, prev); return { c, v: b ? b.amount : monthOf(c.id, prev).total, sure: !!b }; })
     .filter(x => x.v !== 0)
     .sort((a, b) => a.c.pay_day - b.c.pay_day || a.c.sort - b.c.sort);
   if (!items.length) return null;
@@ -492,7 +495,7 @@ function openSoon() {
     <h3 id="sheet-title" tabindex="-1">이번 결제</h3>
     <p class="lead">${mdKo(sal)}(${dow(sal)}) 급여가 들어오면 바로 나가요.</p>
     <div class="sheet-amount num">${won(d.total)}</div>
-    <ul class="pay-list">${d.items.map(x => `<li><span class="d">${x.c.pay_day}일</span><span>${esc(x.c.name)}<span class="acct">${esc(x.c.account || '')}</span></span><span class="v num">${won(x.v)}</span></li>`).join('')}</ul>
+    <ul class="pay-list">${d.items.map(x => `<li><span class="d">${x.c.pay_day}일</span><span>${esc(x.c.name)}<span class="acct">${esc(x.c.account || '')}${x.sure ? ' · 카드사 청구액' : ' · 기록 기준'}</span></span><span class="v num">${won(x.v)}</span></li>`).join('')}</ul>
     ${(() => { const p = planOf(d.bm); if (!p.sal.amount) return ''; const left = p.sal.amount - p.setAside - d.total;
       return `<ul class="pay-list" style="margin-top:22px">
         <li><span class="d"></span><span>급여</span><span class="v num">${won(p.sal.amount)}</span></li>
@@ -653,6 +656,8 @@ function openCard(id) {
     <p class="lead">${md(cyc.start)}부터 ${md(cyc.end)}까지 쓴 돈, ${M(viewBM)}월 ${c.pay_day}일 ${esc(c.account || '')}에서 결제</p>
     ${big}
     ${barHtml(id, m)}
+    ${(() => { const b = billFor(id, viewBM); if (!b) return ''; const diff = b.amount - m.total;
+      return `<div class="tip" style="margin-top:14px"><b>카드사 청구액 ${won(b.amount)}</b>${mdKo(kstDate(b.created_at))}에 받은 결제예정금액 알림이에요. ${diff === 0 ? '기록과 똑같아요.' : `기록보다 ${won(Math.abs(diff))} ${diff < 0 ? '적어요 (할인이나 다음 달로 넘어간 결제 때문일 수 있어요)' : '많아요 (기록에 빠진 결제가 있을 수 있어요)'}.`}</div>`; })()}
     <label class="label" for="budget-input">${M(viewBM)}월 예산</label>
     ${moneyInput('budget-input', m.budget ? comma(m.budget) : '')}
     <p class="hint">한 번 정하면 다음 달에도 같은 금액으로 이어져요.</p>
@@ -785,6 +790,8 @@ let tab = 'spend';
 let salaries = [];
 let items = [];
 let loans = [];
+let bills = {};   // 카드사 '결제예정금액' 알림으로 받은 실제 청구액
+const billFor = (cardId, bm) => bills[cardId + '|' + bm] || null;
 
 // 마이너스통장: 한 달 이자와 다 갚는 달 계산
 function loanInfo(l, extra = 0) {
@@ -867,7 +874,7 @@ function planOf(bm) {
   const cardAuto = act.filter(i => (i.kind === 'fixed' || i.kind === 'subscription') && !deducts(i));
   // 급여 들어오면 옮길 돈
   const sumBy = f => act.filter(i => deducts(i) && f(i)).reduce((a, i) => a + monthlyOf(i), 0);
-  const bill = id => { const x = cards.find(y => y.c.id === id); return closed || x.m.total > x.m.budget ? x.m.total : x.m.budget; };
+  const bill = id => { const real = billFor(id, bm); if (real) return real.amount; const x = cards.find(y => y.c.id === id); return closed || x.m.total > x.m.budget ? x.m.total : x.m.budget; };
   const transfers = [
     ...act.filter(i => i.kind === 'saving').map(i => ({ name: i.name, sub: '적금·투자', v: i.amount })),
     { name: '고정비 통장', sub: '보험 등 고정비', v: sumBy(i => i.kind !== 'saving' && i.kind !== 'sinking' && methodOf(i) === '고정비 통장') },
