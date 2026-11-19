@@ -271,12 +271,21 @@ const currentBillMonth = () => billMonthOf('lotte', today());
 // 결제 한 건이 어느 청구월에 얼마씩 잡히는지 (할부는 나눠서)
 function shares(p) {
   const n = Math.max(1, p.months || 1);
-  const bm0 = p.first_bill_month || billMonthOf(p.card_id, kstDate(p.paid_at));
+  const bm0 = p.first_bill_month || cancelBM(p) || billMonthOf(p.card_id, kstDate(p.paid_at));
   if (n === 1) return [{ bm: bm0, amount: p.amount, k: 1, n: 1 }];
   const unit = card(p.card_id).installment_unit || 1;
   const monthly = p.monthly || Math.floor(p.amount / n / unit) * unit;
   const first = p.amount - monthly * (n - 1);
   return Array.from({ length: n }, (_, i) => ({ bm: addMonths(bm0, i), amount: i === 0 ? first : monthly, k: i + 1, n }));
+}
+
+// 취소는 원래 결제가 잡힌 달의 결제일 전에 들어오면 그 달 카드값에서 빠져요 (카드사 청구 방식)
+function cancelBM(p) {
+  if (!(p.amount < 0)) return null;
+  const o = (typeof cancelLinks !== 'undefined') && cancelLinks[p.id];
+  if (!o || (o.months || 1) > 1) return null;
+  const obm = o.first_bill_month || billMonthOf(o.card_id, kstDate(o.paid_at));
+  return kstDate(p.paid_at) <= ymd(Y(obm), M(obm), card(o.card_id).pay_day) ? obm : null;
 }
 
 // 카드 색: 막대·남은 금액·선택 버튼 모두 이 색을 따라가요
@@ -642,7 +651,7 @@ function openCard(id) {
     const lnText = !ln ? '' : p.amount < 0
       ? `${md(kstDate(ln.paid_at))} ${ln.memo || ln.merchant || ''} 결제 취소`
       : (-ln.amount < p.amount ? `${won(-ln.amount)} 부분 취소됨` : '취소됨')
-        + (billMonthOf(ln.card_id, kstDate(ln.paid_at)) !== s.bm ? ` · ${M(billMonthOf(ln.card_id, kstDate(ln.paid_at)))}월 카드값에서 돌려받아요` : '');
+        + (shares(ln)[0].bm !== s.bm ? ` · ${M(shares(ln)[0].bm)}월 카드값에서 돌려받아요` : '');
     const sub = p.auto ? '자동이체 · 계획 탭에서 고쳐요'
       : [lnText, s.n > 1 ? `할부 ${s.k}/${s.n}` : '', p.memo && p.merchant ? p.merchant : ''].filter(Boolean).join(', ');
     return `<button class="item" onclick="${p.auto ? `openItemEdit('${p.kind}', ${p.item_id})` : `openItem(${p.id})`}">
@@ -689,7 +698,7 @@ function openItem(pid) {
     <div class="sheet-amount num">${p.amount < 0 ? '−' + won(-p.amount) : won(p.amount)}</div>
     ${p.months > 1 ? `<p class="hint" style="margin-top:-4px">${p.months}개월 할부</p>` : ''}
     ${(() => { const ln = cancelLinks[p.id]; if (!ln) return '';
-      const bm = billMonthOf(ln.card_id, kstDate(ln.paid_at));
+      const bm = shares(ln)[0].bm;
       return p.amount < 0
         ? `<div class="tip" style="margin-top:6px"><b>${mdKo(kstDate(ln.paid_at))} 결제의 취소예요</b>${esc(ln.memo || ln.merchant || '')} ${won(ln.amount)}</div>`
         : `<div class="tip" style="margin-top:6px"><b>${mdKo(kstDate(ln.paid_at))}에 ${-ln.amount < p.amount ? won(-ln.amount) + ' 부분 ' : ''}취소됐어요</b>${M(bm)}월 카드값에서 ${won(-ln.amount)} 돌려받아요.</div>`; })()}
