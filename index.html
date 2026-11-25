@@ -334,7 +334,9 @@ function autoDebits(cardId, bm) {
     const lastDay = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
     const date = day >= start ? ymd(Y(prev), M(prev), Math.min(day, lastDay(Y(prev), M(prev)))) : ymd(Y(bm), M(bm), day);
     const amount = i.kind === 'subscription' ? (i.total || i.amount) : i.amount;
-    return { id: 'auto' + i.id, item_id: i.id, kind: i.kind, card_id: cardId, paid_at: date + 'T09:00:00+09:00', amount, merchant: i.name, memo: null, months: 1, source: 'auto', auto: true, _date: date <= cyc.end ? date : cyc.end };
+    const rule = typeof rules !== 'undefined' && ruleFor(cardId, amount, i.name);
+    return { id: 'auto' + i.id, item_id: i.id, kind: i.kind, card_id: cardId, paid_at: date + 'T09:00:00+09:00', amount, merchant: i.name, memo: null, months: 1, source: 'auto', auto: true,
+      reimbursed: !!rule, reimbursed_by: rule ? rule.reimbursed_by : null, _date: date <= cyc.end ? date : cyc.end };
   });
 }
 
@@ -389,9 +391,11 @@ async function load() {
     const sa = await db.from('salaries').select('*');
     const it = await db.from('plan_items').select('*').order('sort').order('id');
     const lo = await db.from('loans').select('*').order('id');
+    const rr = await db.from('reimburse_rules').select('*');
     const bl = await db.from('inbox').select('card_id, bill_month, amount, created_at').eq('kind', 'bill').order('id');
     const s = await db.rpc('collector_status');
     if (seq !== loadSeq) return;
+    rules = rr.error ? [] : (rr.data || []);
     payments = all; budgets = b.data; status = s.data && s.data[0] ? s.data[0] : null;
     salaries = sa.error ? [] : sa.data; items = it.error ? [] : it.data; loans = lo.error ? [] : lo.data;
     bills = {}; (bl.error ? [] : bl.data).forEach(b => { if (b.card_id && b.bill_month) bills[b.card_id + '|' + b.bill_month] = b; });
@@ -694,7 +698,7 @@ function openCard(id) {
       ? `${md(kstDate(ln.paid_at))} ${ln.memo || ln.merchant || ''} 결제 취소`
       : (-ln.amount < p.amount ? `${won(-ln.amount)} 부분 취소됨` : '취소됨')
         + (shares(ln)[0].bm !== s.bm ? ` · ${M(shares(ln)[0].bm)}월 카드값에서 돌려받아요` : '');
-    const sub = p.auto ? '자동이체 · 계획 탭에서 고쳐요'
+    const sub = p.auto ? (p.reimbursed ? `자동이체 · 돌려받음${p.reimbursed_by ? '(' + p.reimbursed_by + ')' : ''}` : '자동이체 · 계획 탭에서 고쳐요')
       : [p.reimbursed ? `돌려받음${p.reimbursed_by ? '(' + p.reimbursed_by + ')' : ''}` : '', lnText, s.n > 1 ? `할부 ${s.k}/${s.n}` : '', p.memo && p.merchant ? p.merchant : ''].filter(Boolean).join(', ');
     return `<button class="item" onclick="${p.auto ? `openItemEdit('${p.kind}', ${p.item_id})` : `openItem(${p.id})`}">
       <span class="d num">${md(kstDate(p.paid_at))}</span>
@@ -893,6 +897,11 @@ let tab = 'spend';
 let salaries = [];
 let items = [];
 let loans = [];
+let rules = [];   // 돌려받는 결제 규칙 (같은 카드·같은 금액·같은 가게)
+function ruleFor(cardId, amount, name) {
+  const n = normName(name);
+  return n && rules.find(r => r.card_id === cardId && r.amount === amount && (n.includes(r.merchant_key) || r.merchant_key.includes(n)));
+}
 let bills = {};   // 카드사 '결제예정금액' 알림으로 받은 실제 청구액
 const billFor = (cardId, bm) => bills[cardId + '|' + bm] || null;
 
