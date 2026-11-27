@@ -218,6 +218,7 @@
 
   <button class="review-btn" id="review-btn" onclick="openReviews()" hidden></button>
   <p class="collector" id="collector"></p>
+  <button class="logout" id="app-settings" onclick="window.GagyebuApp && GagyebuApp.openSettings()" hidden>수집기 설정</button>
   <button class="logout" onclick="openLogout()">로그아웃</button>
 </main>
 
@@ -403,8 +404,22 @@ async function load() {
     console.error(e);
     if (seq === loadSeq) toast('자료를 불러오지 못했어요. 인터넷 연결을 확인해 주세요');
   }
-  if (seq === loadSeq) render();
+  if (seq === loadSeq) { render(); openPendingPay(); }
 }
+
+// 가계부 앱 안에서 열렸을 때만 '수집기 설정' 버튼
+if (window.GagyebuApp) document.getElementById('app-settings').hidden = false;
+
+// 앱 속보를 누르면 ?pay=결제번호 로 열려요 → 그 결제의 메모 화면
+let pendingPay = (() => { try { return Number(new URLSearchParams(location.search).get('pay')) || null; } catch (e) { return null; } })();
+if (pendingPay) history.replaceState(null, '', location.pathname);
+function openPendingPay() {
+  if (!pendingPay) return;
+  const id = pendingPay;
+  if (payments.some(p => p.id === id)) { pendingPay = null; openItem(id); }
+}
+// 앱이 이미 열려 있을 때 앱이 직접 불러요
+window.openPay = id => { pendingPay = Number(id) || null; if (payments.some(p => p.id === pendingPay)) openPendingPay(); else load(); };
 
 // ---------------------------------------------------------------------
 // 그리기
