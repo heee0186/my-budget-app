@@ -1,0 +1,9 @@
+{
+  "headers": [
+    { "source": "/app/gagyebu.apk", "headers": [
+      { "key": "Content-Type", "value": "application/vnd.android.package-archive" },
+      { "key": "Content-Disposition", "value": "attachment; filename=\"gagyebu.apk\"" },
+      { "key": "Cache-Control", "value": "no-cache" } ] },
+    { "source": "/app/version.json", "headers": [ { "key": "Cache-Control", "value": "no-cache" } ] }
+  ]
+}
